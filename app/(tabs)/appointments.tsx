@@ -58,6 +58,7 @@ export default function Appointments() {
   const [editForm, setEditForm] = useState({ date: '', startTime: '', endTime: '', staffId: '', serviceId: '', price: '', notes: '' })
   const [form, setForm] = useState({ customerId: '', serviceId: '', staffId: '', date: todayISO(), startTime: '10:00', endTime: '11:00', price: '', notes: '' })
   const [saving, setSaving] = useState(false)
+  const updatingStatusIds = useRef<Set<string>>(new Set())
 
   const [mainTab, setMainTab] = useState<'randevular' | 'bekleme'>('randevular')
   const [waitingList, setWaitingList] = useState<WaitingEntry[]>([])
@@ -199,11 +200,14 @@ export default function Appointments() {
   }
 
   async function handleStatusChange(id: string, status: string) {
+    if (updatingStatusIds.current.has(id)) return
+    updatingStatusIds.current.add(id)
     try {
       const updated = await api.appointments.update(id, { status })
       setAppointments(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a))
       setDetailApt(prev => prev?.id === id ? { ...prev, ...updated } : prev)
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed')) }
+    finally { updatingStatusIds.current.delete(id) }
   }
 
   function openEditMode(apt: Appointment) {
