@@ -373,6 +373,7 @@ export type TenantProfile = {
   smsUsed: number
   smsCredits: number
   smsMonthlyLimit: number
+  isTurkish: boolean
   reminderSettings?: ReminderSettings
 }
 

@@ -225,7 +225,7 @@ export default function Abonelik() {
             </View>
           )}
 
-          {profile && (
+          {profile?.isTurkish && (
             <View style={s.usageCard}>
               <Text style={s.sectionTitle}>{t('sub_usage_title')}</Text>
               <View style={s.usageRow}>

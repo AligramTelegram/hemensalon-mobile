@@ -145,22 +145,22 @@ export default function Menu() {
               <Text style={s.subSub}>
                 {daysLeft <= 0 ? t('menu_planExpired') : daysLeft <= 7 ? t('menu_planEndsIn', { days: daysLeft }) : t('menu_planDaysLeft', { days: daysLeft })}
               </Text>
-            ) : (
+            ) : profile?.isTurkish ? (
               <Text style={s.subSub}>SMS: {profile.smsUsed ?? 0}/{smsTotal} {t('menu_smsUsed')}</Text>
-            )}
+            ) : null}
           </View>
-          {(daysLeft === null || daysLeft > 7) ? (
+          {(daysLeft === null || daysLeft > 7) && profile?.isTurkish ? (
             <View style={s.smsBarWrap}>
               <View style={s.smsBarTrack}>
                 <View style={[s.smsBarFill, { width: `${smsPct}%` as any, backgroundColor: smsPct >= 80 ? '#DC2626' : planColor }]} />
               </View>
               <Text style={s.smsBarPct}>{Math.round(smsPct)}%</Text>
             </View>
-          ) : (
+          ) : (daysLeft !== null && daysLeft <= 7) ? (
             <View style={[s.upgradeBtn, { backgroundColor: '#DC2626' }]}>
               <Text style={s.upgradeTxt}>{t('menu_upgrade')}</Text>
             </View>
-          )}
+          ) : null}
         </TouchableOpacity>
       )}
 
