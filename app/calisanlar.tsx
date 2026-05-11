@@ -90,7 +90,7 @@ export default function Calisanlar() {
         const idxRaw = await AsyncStorage.getItem('staff_login_index')
         const idx: string[] = idxRaw ? JSON.parse(idxRaw) : []
         if (showLoginSection) {
-          await secureStorage.setItem(`staff_login_${staffId}`, JSON.stringify(loginInfo))
+          await secureStorage.setItem(`staff_login_${staffId}`, JSON.stringify({ ...loginInfo, name: form.name }))
           if (!idx.includes(staffId)) {
             await AsyncStorage.setItem('staff_login_index', JSON.stringify([...idx, staffId]))
           }
