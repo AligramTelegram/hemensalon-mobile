@@ -359,6 +359,19 @@ export type ReminderSettings = {
   remind2h: boolean
 }
 
+export type PlanUsage = {
+  plan: string
+  appointmentsThisMonth: number
+  maxAppointmentsPerMonth: number | null
+  staffCount: number
+  maxStaff: number | null
+  customerCount: number
+  maxCustomers: number | null
+  serviceCount: number
+  maxServices: number | null
+  pct: { appointments: number; staff: number; customers: number; services: number }
+}
+
 export type TenantProfile = {
   id: string
   name: string
@@ -431,6 +444,7 @@ export const api = {
   tenant: {
     get: () => get<TenantProfile>('/api/me'),
     update: (body: Partial<TenantProfile>) => put<TenantProfile>('/api/me', body),
+    usage: () => get<PlanUsage>('/api/me/usage'),
   },
   reminders: {
     getSettings: () => get<ReminderSettings>('/api/me/reminder-settings'),
