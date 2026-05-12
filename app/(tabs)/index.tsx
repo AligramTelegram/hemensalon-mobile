@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [userName, setUserName] = useState('')
   const [birthdayCustomers, setBirthdayCustomers] = useState<Customer[]>([])
   const [usage, setUsage] = useState<PlanUsage | null>(null)
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0)
   const [showFabMenu, setShowFabMenu] = useState(false)
   const [autoRefreshing, setAutoRefreshing] = useState(false)
   const fabAnim = useRef(new Animated.Value(0)).current
@@ -91,18 +92,20 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [data, country, { data: { user } }, products, usageData] = await Promise.all([
+      const [data, country, { data: { user } }, products, usageData, notifs] = await Promise.all([
         api.dashboard.stats(),
         detectCountry(),
         supabase.auth.getUser(),
         api.products.list().catch(() => [] as Product[]),
         api.tenant.usage().catch(() => null),
+        api.notifications.list().catch(() => []),
       ])
       setStats(data)
       setUsage(usageData)
       setSymbol(getPricing(country).symbol)
       setUserName(user?.email?.split('@')[0] ?? '')
       setLowStockProducts(products.filter(p => p.isActive && p.quantity <= p.minQuantity))
+      setUnreadNotifCount(notifs.filter(n => n.isNew).length)
 
       // Doğum günü kontrolü (bugün + 7 gün)
       try {
@@ -246,6 +249,11 @@ export default function Dashboard() {
             </View>
             <TouchableOpacity style={s.notifBtn} onPress={openNotifications}>
               <Ionicons name="notifications-outline" size={22} color="#fff" />
+              {unreadNotifCount > 0 && (
+                <View style={s.notifBadge}>
+                  <Text style={s.notifBadgeTxt}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={[s.notifBtn, { marginLeft: 8 }]} onPress={() => router.push('/arama' as never)}>
               <Ionicons name="search-outline" size={22} color="#fff" />
