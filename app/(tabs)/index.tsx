@@ -8,6 +8,7 @@ import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { api, DashboardStats, Product, Customer, PlanUsage } from '@/lib/api'
 import { detectCountry, getPricing } from '@/lib/pricing'
 import { supabase } from '@/lib/supabase'
@@ -92,20 +93,22 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [data, country, { data: { user } }, products, usageData, notifs] = await Promise.all([
+      const [data, country, { data: { user } }, products, usageData, notifs, readIdsRaw] = await Promise.all([
         api.dashboard.stats(),
         detectCountry(),
         supabase.auth.getUser(),
         api.products.list().catch(() => [] as Product[]),
         api.tenant.usage().catch(() => null),
         api.notifications.list().catch(() => []),
+        AsyncStorage.getItem('read_notification_ids').catch(() => null),
       ])
       setStats(data)
       setUsage(usageData)
       setSymbol(getPricing(country).symbol)
       setUserName(user?.email?.split('@')[0] ?? '')
       setLowStockProducts(products.filter(p => p.isActive && p.quantity <= p.minQuantity))
-      setUnreadNotifCount(notifs.filter(n => n.isNew).length)
+      const readIds: Set<string> = readIdsRaw ? new Set(JSON.parse(readIdsRaw)) : new Set()
+      setUnreadNotifCount(notifs.filter(n => n.isNew && !readIds.has(n.id)).length)
 
       // Doğum günü kontrolü (bugün + 7 gün)
       try {

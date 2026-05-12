@@ -8,8 +8,26 @@ import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { api, Notification } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
+
+const READ_KEY = 'read_notification_ids'
+
+async function getReadIds(): Promise<Set<string>> {
+  try {
+    const raw = await AsyncStorage.getItem(READ_KEY)
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch { return new Set() }
+}
+
+async function markAsRead(id: string) {
+  try {
+    const ids = await getReadIds()
+    ids.add(id)
+    await AsyncStorage.setItem(READ_KEY, JSON.stringify([...ids]))
+  } catch {}
+}
 
 type Tab = 'history' | 'templates'
 
@@ -37,6 +55,7 @@ export default function Bildirimler() {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('history')
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [readIds, setReadIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [templates, setTemplates] = useState<Template[]>(() => [
@@ -57,7 +76,9 @@ export default function Bildirimler() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setNotifications(await api.notifications.list())
+      const [list, ids] = await Promise.all([api.notifications.list(), getReadIds()])
+      setNotifications(list)
+      setReadIds(ids)
     } catch (e) {
       console.warn('load notifications failed:', e)
       setNotifications([])
@@ -88,8 +109,14 @@ export default function Bildirimler() {
     setTemplates(prev => prev.map(tmpl => tmpl.id === id ? { ...tmpl, isActive: !tmpl.isActive } : tmpl))
   }
 
-  const newNotifs = notifications.filter(n => n.isNew)
-  const oldNotifs = notifications.filter(n => !n.isNew)
+  async function handleNotifPress(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    await markAsRead(id)
+    setReadIds(prev => new Set([...prev, id]))
+  }
+
+  const newNotifs = notifications.filter(n => n.isNew && !readIds.has(n.id))
+  const oldNotifs = notifications.filter(n => !n.isNew || readIds.has(n.id))
 
   return (
     <View style={s.root}>
@@ -127,14 +154,14 @@ export default function Bildirimler() {
             {newNotifs.length > 0 && (
               <>
                 <Text style={s.sectionLabel}>{t('notifications_new')}</Text>
-                {newNotifs.map(n => <NotifRow key={n.id} n={n} isNew />)}
+                {newNotifs.map(n => <NotifRow key={n.id} n={n} isNew onPress={() => handleNotifPress(n.id)} />)}
               </>
             )}
 
             {oldNotifs.length > 0 && (
               <>
                 <Text style={[s.sectionLabel, { marginTop: newNotifs.length > 0 ? 20 : 0 }]}>{t('notif_section_old')}</Text>
-                {oldNotifs.map(n => <NotifRow key={n.id} n={n} isNew={false} />)}
+                {oldNotifs.map(n => <NotifRow key={n.id} n={n} isNew={false} onPress={() => {}} />)}
               </>
             )}
 
@@ -249,11 +276,11 @@ export default function Bildirimler() {
   )
 }
 
-function NotifRow({ n, isNew }: { n: Notification; isNew: boolean }) {
+function NotifRow({ n, isNew, onPress }: { n: Notification; isNew: boolean; onPress: () => void }) {
   const color = STATUS_COLOR[n.status] ?? '#6B7280'
   const bg = STATUS_BG[n.status] ?? '#F9FAFB'
   return (
-    <View style={[nr.row, isNew && nr.rowNew]}>
+    <TouchableOpacity style={[nr.row, isNew && nr.rowNew]} onPress={onPress} activeOpacity={0.75}>
       <View style={[nr.icon, { backgroundColor: bg }]}>
         <Ionicons name="cut-outline" size={18} color={color} />
       </View>
@@ -268,7 +295,7 @@ function NotifRow({ n, isNew }: { n: Notification; isNew: boolean }) {
         </View>
       </View>
       {isNew && <View style={nr.dot} />}
-    </View>
+    </TouchableOpacity>
   )
 }
 
