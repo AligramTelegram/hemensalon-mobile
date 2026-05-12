@@ -246,11 +246,6 @@ export default function Dashboard() {
             </View>
             <TouchableOpacity style={s.notifBtn} onPress={openNotifications}>
               <Ionicons name="notifications-outline" size={22} color="#fff" />
-              {(stats?.today ?? 0) > 0 && (
-                <View style={s.notifBadge}>
-                  <Text style={s.notifBadgeTxt}>{stats!.today > 9 ? '9+' : stats!.today}</Text>
-                </View>
-              )}
             </TouchableOpacity>
             <TouchableOpacity style={[s.notifBtn, { marginLeft: 8 }]} onPress={() => router.push('/arama' as never)}>
               <Ionicons name="search-outline" size={22} color="#fff" />
@@ -292,18 +287,23 @@ export default function Dashboard() {
           </View>
         </View>
 
+        {/* Eğimli geçiş */}
+        <View style={s.heroTail} />
+
         {/* Deneme / abonelik bitiş banner */}
         {(trial.isTrialActive || (trial.isSubscriptionActive && trial.daysLeft <= 7)) && (
           <TouchableOpacity
-            style={[s.trialBanner, trial.daysLeft === 0 && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
+            style={[s.trialBanner, trial.daysLeft === 0 && s.trialBannerDanger]}
             onPress={() => router.push('/abonelik' as never)}
-            activeOpacity={0.85}
+            activeOpacity={0.88}
           >
-            <Ionicons
-              name={trial.daysLeft === 0 ? 'warning-outline' : 'time-outline'}
-              size={18}
-              color={trial.daysLeft === 0 ? '#DC2626' : '#D97706'}
-            />
+            <View style={[s.trialIconWrap, trial.daysLeft === 0 ? { backgroundColor: '#FEE2E2' } : { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons
+                name={trial.daysLeft === 0 ? 'warning' : 'time-outline'}
+                size={20}
+                color={trial.daysLeft === 0 ? '#DC2626' : '#D97706'}
+              />
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.trialBannerTitle, trial.daysLeft === 0 && { color: '#DC2626' }]}>
                 {trial.isSubscriptionActive
@@ -314,15 +314,15 @@ export default function Dashboard() {
                     ? t('trial_active_today', { hours: trial.hoursLeft })
                     : t('trial_active_days', { days: trial.daysLeft })}
               </Text>
-              <Text style={s.trialBannerSub}>
+              <Text style={[s.trialBannerSub, trial.daysLeft === 0 && { color: '#DC2626' }]}>
                 {trial.isSubscriptionActive ? t('trial_banner_sub_subscription') : t('trial_banner_sub_trial')}
               </Text>
             </View>
+            <View style={[s.trialBannerArrow, trial.daysLeft === 0 ? { backgroundColor: '#DC2626' } : { backgroundColor: '#D97706' }]}>
+              <Ionicons name="chevron-forward" size={14} color="#fff" />
+            </View>
           </TouchableOpacity>
         )}
-
-        {/* Eğimli geçiş */}
-        <View style={s.heroTail} />
 
         {/* ════════════════════════════════════
             İSTATİSTİK KAYDIRMALI SATIRI
@@ -761,12 +761,25 @@ const s = StyleSheet.create({
   qaLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
 
   trialBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#FDE68A',
-    marginHorizontal: 16, marginTop: 8, borderRadius: 12, padding: 10,
+    marginHorizontal: 16, marginTop: 14, borderRadius: 16, padding: 14,
+    shadowColor: '#D97706', shadowOpacity: 0.12, shadowRadius: 8, elevation: 2,
   },
-  trialBannerTitle: { fontSize: 12, fontWeight: '700', color: '#D97706', marginBottom: 1 },
-  trialBannerSub: { fontSize: 10.5, color: '#92400E' },
+  trialBannerDanger: {
+    backgroundColor: '#FEF2F2', borderColor: '#FECACA',
+    shadowColor: '#DC2626',
+  },
+  trialIconWrap: {
+    width: 40, height: 40, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+  },
+  trialBannerTitle: { fontSize: 13, fontWeight: '800', color: '#D97706', marginBottom: 2 },
+  trialBannerSub: { fontSize: 11.5, color: '#92400E', fontWeight: '500' },
+  trialBannerArrow: {
+    width: 24, height: 24, borderRadius: 8,
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+  },
 
   // Hero tail (curved bottom)
   heroTail: {
