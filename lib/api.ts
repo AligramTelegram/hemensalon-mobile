@@ -10,8 +10,19 @@ async function getHeaders(): Promise<Record<string, string>> {
   }
 
   const staffToken = await secureStorage.getItem('staff_token')
+  const mobileTokenPreview = await secureStorage.getItem('mobile_token').catch(() => null)
+
+  if (__DEV__) {
+    console.log('[api:getHeaders]', {
+      staffTokenPresent: !!staffToken,
+      mobileTokenPresent: !!mobileTokenPreview,
+      hasAuthorizationHeaderBefore: 'Authorization' in headers,
+    })
+  }
+
   if (staffToken) {
     headers['x-staff-token'] = staffToken
+    if (__DEV__) console.log('[api:getHeaders] using x-staff-token')
     return headers
   }
 
@@ -44,9 +55,19 @@ async function getHeaders(): Promise<Record<string, string>> {
   if (accessToken) {
     headers['x-mobile-token'] = accessToken
     headers['Authorization'] = `Bearer ${accessToken}`
+    if (__DEV__) console.log('[api:getHeaders] using mobile Authorization Bearer')
+  } else if (__DEV__) {
+    console.log('[api:getHeaders] no access token resolved')
   }
 
   return headers
+}
+
+export class PlanLimitError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'PlanLimitError'
+  }
 }
 
 const TIMEOUT_MS = 15000
@@ -81,6 +102,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   const data = await res.json().catch(() => null)
   if (!res.ok) {
     console.warn(`API POST failed: ${BASE}${path}`, res.status, data)
+    if (res.status === 402 || res.status === 403) throw new PlanLimitError(data?.error ?? 'Plan limiti aşıldı')
     throw new Error(data?.error ?? `POST ${path} → ${res.status}`)
   }
   return data

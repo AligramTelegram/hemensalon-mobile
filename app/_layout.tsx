@@ -58,7 +58,7 @@ export default function RootLayout() {
     }
     setup();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    const sub = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       if (!s) {
         // Supabase oturumu kapandığında staff token da temizle
@@ -67,7 +67,14 @@ export default function RootLayout() {
         setStaffToken(null);
       }
     });
-    return () => subscription.unsubscribe();
+
+    // Supabase v2'de dönüş tipine göre (subscription objesi ya doğrudan ya da data içinde olabilir)
+    return () => {
+      const anySub = sub as any
+      const subscription = anySub?.subscription
+      if (subscription?.unsubscribe) subscription.unsubscribe()
+      else if (sub?.data?.subscription?.unsubscribe) sub.data.subscription.unsubscribe()
+    };
   }, []);
 
   const isLoggedIn = !!session || !!staffToken;
@@ -102,29 +109,28 @@ export default function RootLayout() {
       if (session && !isStaffSession) {
         try {
           const profile = await api.tenant.get();
-          const PAID_PLANS = ['BASLANGIC', 'PROFESYONEL', 'ISLETME'];
-          const isPaidPlan = PAID_PLANS.includes(profile.plan);
           const now = Date.now();
 
-          // Deneme süresi dolduysa kilitle
-          const trialExpired = !isPaidPlan && !!profile.trialEndsAt &&
-            new Date(profile.trialEndsAt).getTime() < now;
+          // Geçerli erişim: aktif trial VEYA aktif ücretli plan
+          const trialActive = !!profile.trialEndsAt &&
+            new Date(profile.trialEndsAt).getTime() > now;
+          const paidActive = !!profile.planEndsAt &&
+            new Date(profile.planEndsAt).getTime() > now;
 
-          // Ücretli abonelik süresi dolduysa kilitle
-          const subExpired = isPaidPlan && !!profile.planEndsAt &&
-            new Date(profile.planEndsAt).getTime() < now;
+          const hasAccess = trialActive || paidActive;
 
-          const shouldLock = trialExpired || subExpired;
-
-          if (shouldLock && !inPaywall) {
+          if (!hasAccess && !inPaywall) {
             router.replace('/deneme-bitti');
             return;
           }
-          if (!shouldLock && inPaywall) {
+          if (hasAccess && inPaywall) {
             router.replace('/(tabs)');
             return;
           }
-        } catch {}
+        } catch (e) {
+          console.warn('Route guard access check failed:', e)
+          // Hata durumunda kullanıcıyı kilitlememek için paywall yönlendirmesini atla
+        }
       }
     }
     route();

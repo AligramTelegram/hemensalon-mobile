@@ -17,8 +17,6 @@ export type TrialStatus = {
   profile: TenantProfile | null
 }
 
-const PAID_PLANS = ['BASLANGIC', 'PROFESYONEL', 'ISLETME']
-
 export function useTrial(): TrialStatus {
   const [status, setStatus] = useState<TrialStatus>({
     loading: true,
@@ -43,24 +41,23 @@ export function useTrial(): TrialStatus {
   }, [])
 
   function compute(profile: TenantProfile) {
-    const isPaidPlan = PAID_PLANS.includes(profile.plan)
     const now = Date.now()
 
     const trialEndsAt = profile.trialEndsAt ? new Date(profile.trialEndsAt) : null
     const planEndsAt = profile.planEndsAt ? new Date(profile.planEndsAt) : null
 
-    // Deneme durumu (sadece ücretsiz plan)
+    // Deneme durumu — trialEndsAt varsa trial kullanıcısı
     const trialMsLeft = trialEndsAt ? trialEndsAt.getTime() - now : 0
-    const isTrialActive = !isPaidPlan && !!trialEndsAt && trialMsLeft > 0
-    const isTrialExpired = !isPaidPlan && !!trialEndsAt && trialMsLeft <= 0
+    const isTrialActive = !!trialEndsAt && trialMsLeft > 0 && !planEndsAt
+    const isTrialExpired = !!trialEndsAt && trialMsLeft <= 0 && !planEndsAt
 
-    // Abonelik durumu (ücretli plan)
-    const subMsLeft = planEndsAt ? planEndsAt.getTime() - now : Infinity
-    const isSubscriptionActive = isPaidPlan && subMsLeft > 0
-    const isSubscriptionExpired = isPaidPlan && !!planEndsAt && subMsLeft <= 0
+    // Abonelik durumu — planEndsAt varsa ücretli kullanıcı
+    const subMsLeft = planEndsAt ? planEndsAt.getTime() - now : 0
+    const isSubscriptionActive = !!planEndsAt && subMsLeft > 0
+    const isSubscriptionExpired = !!planEndsAt && subMsLeft <= 0
 
-    // Kilit durumu
-    const isLocked = isTrialExpired || isSubscriptionExpired
+    // Kilit: ne trial aktif ne ücretli plan aktif
+    const isLocked = !isTrialActive && !isSubscriptionActive
     const lockReason: LockReason = isTrialExpired
       ? 'trial_expired'
       : isSubscriptionExpired

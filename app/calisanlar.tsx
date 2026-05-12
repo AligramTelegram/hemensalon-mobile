@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, A
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { api, Staff } from '@/lib/api'
+import { api, Staff, PlanLimitError } from '@/lib/api'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { secureStorage } from '@/lib/secureStorage'
 import { useTranslation } from 'react-i18next'
@@ -100,7 +100,20 @@ export default function Calisanlar() {
         }
       }
       setShowModal(false)
-    } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed')) }
+    } catch (e: unknown) {
+      if (e instanceof PlanLimitError) {
+        Alert.alert(
+          '🔒 Personel Limiti Doldu',
+          e.message,
+          [
+            { text: 'Tamam', style: 'cancel' },
+            { text: 'Paketi Yükselt', style: 'default', onPress: () => { setShowModal(false); router.push('/abonelik' as never) } },
+          ]
+        )
+      } else {
+        Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
+      }
+    }
     setSaving(false)
   }
 

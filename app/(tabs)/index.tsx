@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Platform, Animated, Easing,
+  RefreshControl, Platform, Animated, Easing,
   Alert,
 } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, DashboardStats, Product, Customer, PlanUsage } from '@/lib/api'
@@ -47,8 +47,11 @@ export default function Dashboard() {
   const [birthdayCustomers, setBirthdayCustomers] = useState<Customer[]>([])
   const [usage, setUsage] = useState<PlanUsage | null>(null)
   const [showFabMenu, setShowFabMenu] = useState(false)
+  const [autoRefreshing, setAutoRefreshing] = useState(false)
   const fabAnim = useRef(new Animated.Value(0)).current
   const pulseAnim = useRef(new Animated.Value(0.4)).current
+  const spinAnim = useRef(new Animated.Value(0)).current
+  const autoRefreshLoop = useRef<ReturnType<typeof Animated.loop> | null>(null)
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -60,6 +63,19 @@ export default function Dashboard() {
     loop.start()
     return () => loop.stop()
   }, [pulseAnim])
+
+  const startSpinAnim = useCallback(() => {
+    spinAnim.setValue(0)
+    autoRefreshLoop.current = Animated.loop(
+      Animated.timing(spinAnim, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true })
+    )
+    autoRefreshLoop.current.start()
+  }, [spinAnim])
+
+  const stopSpinAnim = useCallback(() => {
+    autoRefreshLoop.current?.stop()
+    spinAnim.setValue(0)
+  }, [spinAnim])
 
   function toggleFabMenu() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
@@ -112,6 +128,32 @@ export default function Dashboard() {
   }, [t])
 
   useEffect(() => { load() }, [load])
+
+  // 5 dakikada bir otomatik yenile
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      setAutoRefreshing(true)
+      startSpinAnim()
+      await load()
+      setAutoRefreshing(false)
+      stopSpinAnim()
+    }, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [load, startSpinAnim, stopSpinAnim])
+
+  // Sayfaya odaklanınca yenile (sekme değişimi, geri geliş)
+  useFocusEffect(
+    useCallback(() => {
+      if (!loading) {
+        setAutoRefreshing(true)
+        startSpinAnim()
+        load().then(() => {
+          setAutoRefreshing(false)
+          stopSpinAnim()
+        })
+      }
+    }, [load, loading, startSpinAnim, stopSpinAnim])
+  )
 
   async function openNotifications() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -213,6 +255,15 @@ export default function Dashboard() {
             <TouchableOpacity style={[s.notifBtn, { marginLeft: 8 }]} onPress={() => router.push('/arama' as never)}>
               <Ionicons name="search-outline" size={22} color="#fff" />
             </TouchableOpacity>
+            {autoRefreshing && (
+              <Animated.View style={[s.notifBtn, { marginLeft: 8 }, {
+                transform: [{
+                  rotate: spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }),
+                }],
+              }]}>
+                <Ionicons name="refresh-outline" size={20} color="rgba(255,255,255,0.75)" />
+              </Animated.View>
+            )}
           </View>
 
           {/* Bugünün büyük sayısı */}
@@ -270,35 +321,6 @@ export default function Dashboard() {
           </TouchableOpacity>
         )}
 
-        {/* Plan limit uyarı banner'ı — %80+ dolduğunda göster */}
-        {usage && (() => {
-          const items: { label: string; pct: number }[] = []
-          if (usage.maxAppointmentsPerMonth && usage.pct.appointments >= 80)
-            items.push({ label: `Randevu: ${usage.appointmentsThisMonth}/${usage.maxAppointmentsPerMonth}`, pct: usage.pct.appointments })
-          if (usage.maxCustomers && usage.pct.customers >= 80)
-            items.push({ label: `Müşteri: ${usage.customerCount}/${usage.maxCustomers}`, pct: usage.pct.customers })
-          if (usage.maxStaff && usage.pct.staff >= 100)
-            items.push({ label: `Personel: ${usage.staffCount}/${usage.maxStaff}`, pct: usage.pct.staff })
-          if (items.length === 0) return null
-          const isFull = items.some(i => i.pct >= 100)
-          return (
-            <TouchableOpacity
-              style={[s.limitBanner, isFull && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
-              onPress={() => router.push('/abonelik' as never)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name={isFull ? 'lock-closed-outline' : 'alert-circle-outline'} size={18} color={isFull ? '#DC2626' : '#D97706'} />
-              <View style={{ flex: 1 }}>
-                <Text style={[s.limitBannerTitle, isFull && { color: '#DC2626' }]}>
-                  {isFull ? 'Plan limitine ulaştınız' : 'Plan limitine yaklaşıyorsunuz'}
-                </Text>
-                <Text style={s.limitBannerSub}>{items.map(i => i.label).join(' · ')} — Yükselt</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={isFull ? '#DC2626' : '#D97706'} />
-            </TouchableOpacity>
-          )
-        })()}
-
         {/* Eğimli geçiş */}
         <View style={s.heroTail} />
 
@@ -334,6 +356,58 @@ export default function Dashboard() {
             bg={netProfit >= 0 ? '#D1FAE5' : '#FEE2E2'}
           />
         </ScrollView>
+
+        {/* Plan limit uyarı kartı */}
+        {usage && (() => {
+          const items: { label: string; pct: number; icon: string }[] = []
+          if (usage.maxAppointmentsPerMonth && usage.pct.appointments >= 80)
+            items.push({ label: 'Randevu', pct: usage.pct.appointments, icon: 'calendar-outline' })
+          if (usage.maxCustomers && usage.pct.customers >= 80)
+            items.push({ label: 'Müşteri', pct: usage.pct.customers, icon: 'people-outline' })
+          if (usage.maxStaff && usage.pct.staff >= 100)
+            items.push({ label: 'Personel', pct: usage.pct.staff, icon: 'person-outline' })
+          if (items.length === 0) return null
+          const isFull = items.some(i => i.pct >= 100)
+          const accent = isFull ? '#DC2626' : '#D97706'
+          const bgCard = isFull ? '#FFF5F5' : '#FFFBEB'
+          const bgBar = isFull ? '#FEE2E2' : '#FEF3C7'
+          return (
+            <TouchableOpacity
+              style={[s.limitCard, { backgroundColor: bgCard, borderColor: isFull ? '#FECACA' : '#FDE68A' }]}
+              onPress={() => router.push('/abonelik' as never)}
+              activeOpacity={0.88}
+            >
+              <View style={[s.limitCardIcon, { backgroundColor: isFull ? '#FEE2E2' : '#FEF3C7' }]}>
+                <Ionicons name={isFull ? 'lock-closed' : 'alert-circle'} size={22} color={accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.limitCardTitle, { color: accent }]}>
+                  {isFull ? 'Plan limitine ulaştınız' : 'Limite yaklaşıyorsunuz'}
+                </Text>
+                <View style={{ gap: 6, marginTop: 8 }}>
+                  {items.map(item => (
+                    <View key={item.label} style={{ gap: 3 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name={item.icon as never} size={11} color={accent} />
+                          <Text style={[s.limitCardBarLabel, { color: accent }]}>{item.label}</Text>
+                        </View>
+                        <Text style={[s.limitCardBarLabel, { color: accent }]}>{Math.min(item.pct, 100)}%</Text>
+                      </View>
+                      <View style={[s.limitBarTrack, { backgroundColor: bgBar }]}>
+                        <View style={[s.limitBarFill, { width: `${Math.min(item.pct, 100)}%` as never, backgroundColor: accent }]} />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+                <View style={s.limitCardFooter}>
+                  <Text style={[s.limitCardUpgrade, { color: accent }]}>Paketi yükselt</Text>
+                  <Ionicons name="arrow-forward" size={12} color={accent} />
+                </View>
+              </View>
+            </TouchableOpacity>
+          )
+        })()}
 
         {/* ════════════════════════════════════
             BUGÜNÜN RANDEVULARI
@@ -687,12 +761,12 @@ const s = StyleSheet.create({
   qaLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
 
   trialBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#FDE68A',
-    marginHorizontal: 16, marginTop: 12, borderRadius: 14, padding: 12,
+    marginHorizontal: 16, marginTop: 8, borderRadius: 12, padding: 10,
   },
-  trialBannerTitle: { fontSize: 13, fontWeight: '700', color: '#D97706', marginBottom: 1 },
-  trialBannerSub: { fontSize: 11, color: '#92400E' },
+  trialBannerTitle: { fontSize: 12, fontWeight: '700', color: '#D97706', marginBottom: 1 },
+  trialBannerSub: { fontSize: 10.5, color: '#92400E' },
 
   // Hero tail (curved bottom)
   heroTail: {
@@ -824,4 +898,12 @@ const s = StyleSheet.create({
   limitBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', marginHorizontal: 16, marginTop: 10, borderRadius: 14, padding: 12 },
   limitBannerTitle: { fontSize: 13, fontWeight: '700', color: '#92400E', marginBottom: 2 },
   limitBannerSub: { fontSize: 12, color: '#B45309' },
+  limitCard: { flexDirection: 'row', gap: 14, marginHorizontal: 16, marginBottom: 8, borderRadius: 18, borderWidth: 1.5, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  limitCardIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  limitCardTitle: { fontSize: 14, fontWeight: '800' },
+  limitCardBarLabel: { fontSize: 11, fontWeight: '600' },
+  limitBarTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  limitBarFill: { height: 6, borderRadius: 3 },
+  limitCardFooter: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 },
+  limitCardUpgrade: { fontSize: 12, fontWeight: '700' },
 })

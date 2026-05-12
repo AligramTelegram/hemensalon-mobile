@@ -24,6 +24,7 @@ type PlanDef = {
   icon: IoniconsName
   featureKeys: string[]
   missingKeys: string[]
+  smsKey: string
   popular?: boolean
 }
 
@@ -36,6 +37,7 @@ const PLANS: PlanDef[] = [
     icon: 'rocket-outline',
     featureKeys: ['plan_BASLANGIC_f1', 'plan_BASLANGIC_f2', 'plan_BASLANGIC_f3', 'plan_BASLANGIC_f4'],
     missingKeys: ['plan_BASLANGIC_m1', 'plan_BASLANGIC_m2', 'plan_BASLANGIC_m3', 'plan_BASLANGIC_m4'],
+    smsKey: 'plan_BASLANGIC_sms',
   },
   {
     key: 'PROFESYONEL',
@@ -46,6 +48,7 @@ const PLANS: PlanDef[] = [
     popular: true,
     featureKeys: ['plan_PROFESYONEL_f1', 'plan_PROFESYONEL_f2', 'plan_PROFESYONEL_f3', 'plan_PROFESYONEL_f4', 'plan_PROFESYONEL_f5', 'plan_PROFESYONEL_f6'],
     missingKeys: ['plan_PROFESYONEL_m1', 'plan_PROFESYONEL_m2'],
+    smsKey: 'plan_PROFESYONEL_sms',
   },
   {
     key: 'ISLETME',
@@ -55,6 +58,7 @@ const PLANS: PlanDef[] = [
     icon: 'business-outline',
     featureKeys: ['plan_ISLETME_f1', 'plan_ISLETME_f2', 'plan_ISLETME_f3', 'plan_ISLETME_f4', 'plan_ISLETME_f5', 'plan_ISLETME_f6'],
     missingKeys: [],
+    smsKey: 'plan_ISLETME_sms',
   },
 ]
 
@@ -284,6 +288,12 @@ export default function Abonelik() {
                       <Text style={s.featureTxt}>{t(fk)}</Text>
                     </View>
                   ))}
+                  {profile?.isTurkish && (
+                    <View style={s.featureRow}>
+                      <Ionicons name="chatbubble-ellipses" size={15} color={plan.color} />
+                      <Text style={s.featureTxt}>{t(plan.smsKey)}</Text>
+                    </View>
+                  )}
                   {plan.missingKeys.map(fk => (
                     <View key={fk} style={s.featureRow}>
                       <Ionicons name="close-circle-outline" size={15} color="#D1D5DB" />
