@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, StaffDetail, Leave, PlanLimitError } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
+import { usePlanFeatures } from '@/lib/usePlanFeatures'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -36,6 +37,7 @@ export default function PersonelDetay() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const headerPad = useHeaderPad()
+  const planFeatures = usePlanFeatures()
 
   const WORK_DAYS = [
     { label: t('day_mon'), day: 1 }, { label: t('day_tue'), day: 2 },
@@ -83,6 +85,24 @@ export default function PersonelDetay() {
   async function handleToggleActive() {
     if (!staff) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+
+    // Pasif → aktif yaparken client-side limit kontrolü
+    if (!staff.isActive && !planFeatures.loading) {
+      const allStaff = await api.staff.list().catch(() => [])
+      const activeCount = allStaff.filter(s => s.isActive).length
+      if (activeCount >= planFeatures.maxStaff) {
+        Alert.alert(
+          t('staff_limit_alert_title'),
+          t('staff_limit_reactivate', { max: planFeatures.maxStaff }),
+          [
+            { text: t('ok'), style: 'cancel' },
+            { text: t('plan_upgrade_btn'), onPress: () => router.push('/abonelik' as never) },
+          ]
+        )
+        return
+      }
+    }
+
     const stateLabel = staff.isActive ? t('personel_make_passive') : t('personel_make_active')
     Alert.alert(
       stateLabel,

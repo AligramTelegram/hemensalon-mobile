@@ -1154,6 +1154,7 @@ const tr = {
   staff_password_change_label: 'Şifre Değiştir (opsiyonel)',
   staff_password_change_placeholder: 'Boş bırakın değiştirmek istemiyorsanız',
   staff_limit_alert_title: '🔒 Personel Limiti Doldu',
+  staff_limit_reactivate: 'Planınız en fazla {{max}} aktif çalışana izin veriyor. Paketi yükseltin veya başka bir çalışanı pasife alın.',
 
   // Kampanya
   campaign_title: 'Kampanyalar',
@@ -2586,6 +2587,7 @@ const en: typeof tr = {
   staff_password_change_label: 'Change Password (optional)',
   staff_password_change_placeholder: 'Leave empty to keep unchanged',
   staff_limit_alert_title: '🔒 Staff Limit Reached',
+  staff_limit_reactivate: 'Your plan allows a maximum of {{max}} active staff. Upgrade your plan or deactivate another staff member.',
   campaign_title: 'Campaigns',
   campaign_sub: 'Send bulk messages to your customers',
   coming_soon_title: 'Coming Soon',
@@ -3975,6 +3977,7 @@ const de: typeof tr = {
   staff_password_change_label: 'Passwort ändern (optional)',
   staff_password_change_placeholder: 'Leer lassen um nicht zu ändern',
   staff_limit_alert_title: '🔒 Mitarbeiterlimit erreicht',
+  staff_limit_reactivate: 'Ihr Plan erlaubt maximal {{max}} aktive Mitarbeiter. Upgraden Sie oder deaktivieren Sie einen anderen Mitarbeiter.',
   campaign_title: 'Kampagnen',
   campaign_sub: 'Senden Sie Massennachrichten an Ihre Kunden',
   coming_soon_title: 'Demnächst verfügbar',
@@ -5349,6 +5352,7 @@ const ar: typeof tr = {
   staff_password_change_label: 'تغيير كلمة المرور (اختياري)',
   staff_password_change_placeholder: 'اتركه فارغاً إذا لم تريد التغيير',
   staff_limit_alert_title: '🔒 تم الوصول إلى حد الموظفين',
+  staff_limit_reactivate: 'تسمح خطتك بحد أقصى {{max}} موظف نشط. قم بترقية خطتك أو إلغاء تفعيل موظف آخر.',
   campaign_title: 'الحملات',
   campaign_sub: 'أرسل رسائل جماعية لعملائك',
   coming_soon_title: 'قريباً',
