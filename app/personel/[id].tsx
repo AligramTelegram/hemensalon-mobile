@@ -8,7 +8,7 @@ import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
-import { api, StaffDetail, Leave } from '@/lib/api'
+import { api, StaffDetail, Leave, PlanLimitError } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
@@ -94,7 +94,16 @@ export default function PersonelDetay() {
             try {
               const updated = await api.staff.update(staff.id, { isActive: !staff.isActive })
               setStaff(prev => prev ? { ...prev, ...updated } : prev)
-            } catch { Alert.alert(t('error'), t('err_failed')) }
+            } catch (e) {
+              if (e instanceof PlanLimitError) {
+                Alert.alert(t('staff_limit_alert_title'), e.message, [
+                  { text: t('ok'), style: 'cancel' },
+                  { text: t('plan_upgrade_btn'), onPress: () => router.push('/abonelik' as never) },
+                ])
+              } else {
+                Alert.alert(t('error'), t('err_failed'))
+              }
+            }
           },
         },
       ]
