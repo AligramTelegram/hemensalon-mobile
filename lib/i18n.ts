@@ -83,8 +83,10 @@ const tr = {
 
   // ── Çalışanlar ──────────────────────────────────────────────
   staff_title: 'Çalışanlar',
-  staff_count: '{{count}} personel kayıtlı',
+  staff_count: '{{count}} aktif personel',
   staff_empty: 'Henüz çalışan eklenmedi',
+  staff_inactive_section: 'Pasif Çalışanlar',
+  staff_inactive_badge: 'Pasif',
   staff_new: 'Yeni Çalışan',
   staff_edit: 'Çalışanı Düzenle',
   staff_delete_confirm_title: 'Çalışanı Sil',
@@ -806,6 +808,7 @@ const tr = {
   personel_leave_other_type: '📝 Diğer',
   personel_leave_start: 'Başlangıç Tarihi *',
   personel_leave_end: 'Bitiş Tarihi *',
+  personel_leave_select_date: 'Tarih seçin',
   personel_leave_reason: 'Açıklama',
   personel_leave_optional: 'İsteğe bağlı...',
   personel_leave_dates_required: 'Başlangıç ve bitiş tarihi zorunludur.',
@@ -1565,7 +1568,9 @@ const en: typeof tr = {
 
   // ── Staff ───────────────────────────────────────────────────
   staff_title: 'Staff',
-  staff_count: '{{count}} staff registered',
+  staff_count: '{{count}} active staff',
+  staff_inactive_section: 'Inactive Staff',
+  staff_inactive_badge: 'Inactive',
   staff_empty: 'No staff added yet',
   staff_new: 'New Staff',
   staff_edit: 'Edit Staff',
@@ -2251,6 +2256,7 @@ const en: typeof tr = {
   personel_leave_other_type: '📝 Other',
   personel_leave_start: 'Start Date *',
   personel_leave_end: 'End Date *',
+  personel_leave_select_date: 'Select date',
   personel_leave_reason: 'Description',
   personel_leave_optional: 'Optional...',
   personel_leave_dates_required: 'Start and end date are required.',
@@ -2977,7 +2983,9 @@ const de: typeof tr = {
 
   // ── Personal ────────────────────────────────────────────────
   staff_title: 'Mitarbeiter',
-  staff_count: '{{count}} Mitarbeiter registriert',
+  staff_count: '{{count}} aktive Mitarbeiter',
+  staff_inactive_section: 'Inaktive Mitarbeiter',
+  staff_inactive_badge: 'Inaktiv',
   staff_empty: 'Noch keine Mitarbeiter hinzugefügt',
   staff_new: 'Neuer Mitarbeiter',
   staff_edit: 'Mitarbeiter bearbeiten',
@@ -3637,6 +3645,7 @@ const de: typeof tr = {
   personel_leave_other_type: '📝 Sonstiges',
   personel_leave_start: 'Startdatum *',
   personel_leave_end: 'Enddatum *',
+  personel_leave_select_date: 'Datum auswählen',
   personel_leave_reason: 'Beschreibung',
   personel_leave_optional: 'Optional...',
   personel_leave_dates_required: 'Start- und Enddatum sind erforderlich.',
@@ -4348,7 +4357,9 @@ const ar: typeof tr = {
 
   // ── الموظفون ────────────────────────────────────────────────
   staff_title: 'الموظفون',
-  staff_count: '{{count}} موظف مسجّل',
+  staff_count: '{{count}} موظف نشط',
+  staff_inactive_section: 'الموظفون غير النشطين',
+  staff_inactive_badge: 'غير نشط',
   staff_empty: 'لم يُضَف موظفون بعد',
   staff_new: 'موظف جديد',
   staff_edit: 'تعديل الموظف',
@@ -5008,6 +5019,7 @@ const ar: typeof tr = {
   personel_leave_other_type: '📝 أخرى',
   personel_leave_start: 'تاريخ البداية *',
   personel_leave_end: 'تاريخ النهاية *',
+  personel_leave_select_date: 'اختر تاريخاً',
   personel_leave_reason: 'الوصف',
   personel_leave_optional: 'اختياري...',
   personel_leave_dates_required: 'تاريخ البداية والنهاية مطلوبان.',

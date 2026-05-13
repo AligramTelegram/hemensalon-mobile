@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Platform, RefreshControl, TextInput, Modal,
 } from 'react-native'
+import DateTimePicker from '@react-native-community/datetimepicker'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -62,6 +63,8 @@ export default function PersonelDetay() {
   const [showLeaveModal, setShowLeaveModal] = useState(false)
   const [leaveForm, setLeaveForm] = useState({ type: 'IZIN' as Leave['type'], startDate: '', endDate: '', reason: '' })
   const [savingLeave, setSavingLeave] = useState(false)
+  const [showStartPicker, setShowStartPicker] = useState(false)
+  const [showEndPicker, setShowEndPicker] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -121,6 +124,8 @@ export default function PersonelDetay() {
       setLeaves(prev => [newLeave, ...prev])
       setShowLeaveModal(false)
       setLeaveForm({ type: 'IZIN', startDate: '', endDate: '', reason: '' })
+      setShowStartPicker(false)
+      setShowEndPicker(false)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch (e: unknown) {
       Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
@@ -541,10 +546,63 @@ export default function PersonelDetay() {
             </View>
 
             <Text style={[lm.label, { marginTop: 16 }]}>{t('personel_leave_start')}</Text>
-            <TextInput style={lm.input} value={leaveForm.startDate} onChangeText={v => setLeaveForm(f => ({ ...f, startDate: v }))} placeholder="YYYY-MM-DD" placeholderTextColor="#9CA3AF" />
+            <TouchableOpacity style={lm.dateBtn} onPress={() => { setShowEndPicker(false); setShowStartPicker(v => !v) }}>
+              <Ionicons name="calendar-outline" size={18} color="#7C3AED" />
+              <Text style={[lm.dateTxt, !leaveForm.startDate && { color: '#9CA3AF' }]}>
+                {leaveForm.startDate
+                  ? new Date(leaveForm.startDate + 'T12:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
+                  : t('personel_leave_select_date')}
+              </Text>
+              <Ionicons name={showStartPicker ? 'chevron-up' : 'chevron-down'} size={16} color="#9CA3AF" style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+            {showStartPicker && (
+              <View style={lm.pickerWrap}>
+                <DateTimePicker
+                  value={leaveForm.startDate ? new Date(leaveForm.startDate + 'T12:00:00') : new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'spinner'}
+                  locale="tr-TR"
+                  themeVariant="light"
+                  accentColor="#7C3AED"
+                  onChange={(_, date) => {
+                    if (date) {
+                      const iso = date.toISOString().split('T')[0]
+                      setLeaveForm(f => ({ ...f, startDate: iso }))
+                    }
+                  }}
+                />
+              </View>
+            )}
 
             <Text style={lm.label}>{t('personel_leave_end')}</Text>
-            <TextInput style={lm.input} value={leaveForm.endDate} onChangeText={v => setLeaveForm(f => ({ ...f, endDate: v }))} placeholder="YYYY-MM-DD" placeholderTextColor="#9CA3AF" />
+            <TouchableOpacity style={lm.dateBtn} onPress={() => { setShowStartPicker(false); setShowEndPicker(v => !v) }}>
+              <Ionicons name="calendar-outline" size={18} color="#7C3AED" />
+              <Text style={[lm.dateTxt, !leaveForm.endDate && { color: '#9CA3AF' }]}>
+                {leaveForm.endDate
+                  ? new Date(leaveForm.endDate + 'T12:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
+                  : t('personel_leave_select_date')}
+              </Text>
+              <Ionicons name={showEndPicker ? 'chevron-up' : 'chevron-down'} size={16} color="#9CA3AF" style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+            {showEndPicker && (
+              <View style={lm.pickerWrap}>
+                <DateTimePicker
+                  value={leaveForm.endDate ? new Date(leaveForm.endDate + 'T12:00:00') : new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'spinner'}
+                  locale="tr-TR"
+                  themeVariant="light"
+                  accentColor="#7C3AED"
+                  minimumDate={leaveForm.startDate ? new Date(leaveForm.startDate + 'T12:00:00') : undefined}
+                  onChange={(_, date) => {
+                    if (date) {
+                      const iso = date.toISOString().split('T')[0]
+                      setLeaveForm(f => ({ ...f, endDate: iso }))
+                    }
+                  }}
+                />
+              </View>
+            )}
 
             <Text style={lm.label}>{t('personel_leave_reason')}</Text>
             <TextInput style={lm.input} value={leaveForm.reason} onChangeText={v => setLeaveForm(f => ({ ...f, reason: v }))} placeholder={t('personel_leave_optional')} placeholderTextColor="#9CA3AF" />
@@ -605,6 +663,9 @@ const lm = StyleSheet.create({
   typeBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#F3F4F6', borderWidth: 1.5, borderColor: '#E5E7EB' },
   typeTxt: { fontSize: 13, fontWeight: '600', color: '#374151' },
   input: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, fontSize: 15, color: '#111827', marginBottom: 12 },
+  dateBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, marginBottom: 4 },
+  dateTxt: { fontSize: 15, color: '#111827', fontWeight: '500', flex: 1 },
+  pickerWrap: { backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden', marginBottom: 12 },
   saveBtn: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   saveTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
 })

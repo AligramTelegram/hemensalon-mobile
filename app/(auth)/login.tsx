@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView,
-  Platform, ScrollView, Dimensions, Modal,
+  Platform, ScrollView, Dimensions, Modal, Image,
 } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter } from 'expo-router'
@@ -199,9 +199,7 @@ export default function Login() {
 
         {/* Logo */}
         <View style={[s.hero, { paddingTop: headerPad }]}>
-          <View style={s.heroIcon}>
-            <Ionicons name="cut" size={36} color="#fff" />
-          </View>
+          <Image source={require('@/assets/icon.png')} style={s.heroIcon} />
           <Text style={s.heroTitle}>HemenSalon</Text>
         </View>
 
@@ -321,9 +319,7 @@ export default function Login() {
 
         {/* Logo */}
         <View style={s.formLogoWrap}>
-          <View style={s.logoIcon}>
-            <Ionicons name="cut" size={28} color="#fff" />
-          </View>
+          <Image source={require('@/assets/icon.png')} style={s.logoIcon} />
           <Text style={s.logoText}>HemenSalon</Text>
         </View>
 
@@ -529,7 +525,7 @@ const s = StyleSheet.create({
 
   // ── Landing ──
   hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 16 },
-  heroIcon: { width: 48, height: 48, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)' },
+  heroIcon: { width: 48, height: 48, borderRadius: 15 },
   heroTitle: { fontSize: 30, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
 
   carousel: { flex: 1 },
@@ -567,7 +563,7 @@ const s = StyleSheet.create({
   backBtnTxt: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
 
   formLogoWrap: { flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'center', marginBottom: 28 },
-  logoIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  logoIcon: { width: 44, height: 44, borderRadius: 14 },
   logoText: { fontSize: 24, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
 
   card: { backgroundColor: '#fff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 24, elevation: 10 },

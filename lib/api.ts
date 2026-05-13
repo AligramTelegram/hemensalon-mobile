@@ -474,7 +474,7 @@ export const api = {
     register: (pushToken: string) => patch('/api/me/push-token', { pushToken }),
   },
   staff: {
-    list: () => get<Staff[]>('/api/staff'),
+    list: () => get<Staff[]>('/api/staff', { all: 'true' }),
     create: (body: { name: string; email?: string; phone?: string; color: string; title?: string; password?: string }) =>
       post<Staff>('/api/staff/create', body),
     update: (id: string, body: Partial<Staff>) => put<Staff>(`/api/staff/${id}`, body),

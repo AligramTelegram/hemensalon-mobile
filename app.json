@@ -30,9 +30,14 @@
       },
       "googleServicesFile": "./google-services.json",
       "package": "com.hemensalon.mobile",
-      "versionCode": 7,
+      "versionCode": 8,
       "edgeToEdgeEnabled": true,
       "permissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.RECORD_AUDIO",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE",
@@ -60,7 +65,8 @@
           "color": "#7C3AED",
           "sounds": []
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "scheme": "hemensalon",
     "extra": {
@@ -68,6 +74,12 @@
       "eas": {
         "projectId": "95e15bc2-b5de-4a43-a884-7055e320b629"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/95e15bc2-b5de-4a43-a884-7055e320b629"
     }
   }
 }

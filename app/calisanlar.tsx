@@ -99,6 +99,11 @@ export default function Calisanlar() {
     setSaving(false)
   }
 
+  const q = search.toLowerCase()
+  const activeStaff = staff.filter(st => st.isActive && st.name.toLowerCase().includes(q))
+  const inactiveStaff = staff.filter(st => !st.isActive && st.name.toLowerCase().includes(q))
+  const activeCount = staff.filter(st => st.isActive).length
+
   return (
     <View style={s.root}>
       <View style={[s.header, { paddingTop: headerPad }]}>
@@ -109,35 +114,35 @@ export default function Calisanlar() {
             <Ionicons name="chevron-back" size={26} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[s.addBtn, staff.length >= planFeatures.maxStaff && { backgroundColor: '#E5E7EB' }]}
+            style={[s.addBtn, activeCount >= planFeatures.maxStaff && { backgroundColor: '#E5E7EB' }]}
             onPress={() => {
-              if (staff.length >= planFeatures.maxStaff) {
+              if (activeCount >= planFeatures.maxStaff) {
                 router.push('/abonelik' as never)
               } else {
                 openCreate()
               }
             }}
           >
-            {staff.length >= planFeatures.maxStaff
+            {activeCount >= planFeatures.maxStaff
               ? <Ionicons name="lock-closed" size={14} color="#9CA3AF" />
               : <Ionicons name="add" size={16} color="#7C3AED" />
             }
-            <Text style={[s.addTxt, staff.length >= planFeatures.maxStaff && { color: '#9CA3AF' }]}>
-              {staff.length >= planFeatures.maxStaff ? t('menu_upgrade') : t('new')}
+            <Text style={[s.addTxt, activeCount >= planFeatures.maxStaff && { color: '#9CA3AF' }]}>
+              {activeCount >= planFeatures.maxStaff ? t('menu_upgrade') : t('new')}
             </Text>
           </TouchableOpacity>
         </View>
         <Text style={s.headerTitle}>{t('staff_title')}</Text>
-        <Text style={s.headerSub}>{t('staff_count', { count: staff.length })}</Text>
+        <Text style={s.headerSub}>{t('staff_count', { count: activeCount })}</Text>
       </View>
       <View style={s.headerCurve} />
 
       {/* Plan limit uyarısı */}
-      {!planFeatures.loading && staff.length >= planFeatures.maxStaff && (
+      {!planFeatures.loading && activeCount >= planFeatures.maxStaff && (
         <TouchableOpacity style={s.limitBanner} onPress={() => router.push('/abonelik' as never)} activeOpacity={0.85}>
           <Ionicons name="lock-closed" size={16} color="#D97706" />
           <View style={{ flex: 1 }}>
-            <Text style={s.limitBannerTitle}>{t('staff_limit_title', { current: staff.length, max: planFeatures.maxStaff })}</Text>
+            <Text style={s.limitBannerTitle}>{t('staff_limit_title', { current: activeCount, max: planFeatures.maxStaff })}</Text>
             <Text style={s.limitBannerSub}>{t('staff_limit_sub')}</Text>
           </View>
           <View style={s.limitBannerBadge}><Text style={s.limitBannerBadgeTxt}>{t('sub_upgrade_btn')}</Text></View>
@@ -162,43 +167,25 @@ export default function Calisanlar() {
       </View>
 
       {loading ? <View style={s.center}><ActivityIndicator color="#7C3AED" /></View> : (
-        <FlatList
-          data={staff.filter(st => st.name.toLowerCase().includes(search.toLowerCase()))}
-          keyExtractor={i => i.id}
+        <ScrollView
           contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}
-          ListEmptyComponent={<Text style={s.empty}>{t('staff_empty')}</Text>}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={s.card} onPress={() => router.push(`/personel/${item.id}` as never)} activeOpacity={0.85}>
-              <View style={[s.avatar, { backgroundColor: item.color }]}>
-                <Text style={s.avatarTxt}>{item.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}</Text>
-              </View>
-              <View style={s.cardInfo}>
-                <Text style={s.cardName}>{item.name}</Text>
-                {item.title && <Text style={s.cardTitle}>{item.title}</Text>}
-                {item.services.length > 0 && (
-                  <View style={s.serviceChips}>
-                    {item.services.slice(0, 3).map(sv => (
-                      <Text key={sv.id} style={s.svcChip}>{sv.name}</Text>
-                    ))}
-                    {item.services.length > 3 && <Text style={s.svcChip}>+{item.services.length - 3}</Text>}
-                  </View>
-                )}
-              </View>
-              <View style={s.cardActions}>
-                <TouchableOpacity style={s.cardActionBtn} onPress={() => openEdit(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
-                  <Ionicons name="create-outline" size={19} color="#7C3AED" />
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.cardActionBtn, s.cardDeleteBtn]} onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} disabled={deleting === item.id}>
-                  {deleting === item.id
-                    ? <ActivityIndicator size="small" color="#DC2626" />
-                    : <Ionicons name="trash-outline" size={19} color="#DC2626" />
-                  }
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
+        >
+          {activeStaff.length === 0 && inactiveStaff.length === 0 && (
+            <Text style={s.empty}>{t('staff_empty')}</Text>
           )}
-        />
+          {activeStaff.map(item => (
+            <StaffCard key={item.id} item={item} onPress={() => router.push(`/personel/${item.id}` as never)} onEdit={() => openEdit(item)} onDelete={() => handleDelete(item)} deleting={deleting === item.id} />
+          ))}
+          {inactiveStaff.length > 0 && (
+            <>
+              <Text style={s.sectionLabel}>{t('staff_inactive_section')}</Text>
+              {inactiveStaff.map(item => (
+                <StaffCard key={item.id} item={item} inactive onPress={() => router.push(`/personel/${item.id}` as never)} onEdit={() => openEdit(item)} onDelete={() => handleDelete(item)} deleting={deleting === item.id} />
+              ))}
+            </>
+          )}
+        </ScrollView>
       )}
 
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
@@ -253,6 +240,43 @@ export default function Calisanlar() {
   )
 }
 
+function StaffCard({ item, inactive, onPress, onEdit, onDelete, deleting }: { item: Staff; inactive?: boolean; onPress: () => void; onEdit: () => void; onDelete: () => void; deleting: boolean }) {
+  const { t } = useTranslation()
+  return (
+    <TouchableOpacity style={[s.card, inactive && s.cardInactive]} onPress={onPress} activeOpacity={0.85}>
+      <View style={[s.avatar, { backgroundColor: inactive ? '#D1D5DB' : item.color }]}>
+        <Text style={s.avatarTxt}>{item.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}</Text>
+      </View>
+      <View style={s.cardInfo}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[s.cardName, inactive && { color: '#9CA3AF' }]}>{item.name}</Text>
+          {inactive && <View style={s.inactiveBadge}><Text style={s.inactiveBadgeTxt}>{t('staff_inactive_badge')}</Text></View>}
+        </View>
+        {item.title && <Text style={s.cardTitle}>{item.title}</Text>}
+        {!inactive && item.services.length > 0 && (
+          <View style={s.serviceChips}>
+            {item.services.slice(0, 3).map(sv => (
+              <Text key={sv.id} style={s.svcChip}>{sv.name}</Text>
+            ))}
+            {item.services.length > 3 && <Text style={s.svcChip}>+{item.services.length - 3}</Text>}
+          </View>
+        )}
+      </View>
+      <View style={s.cardActions}>
+        <TouchableOpacity style={s.cardActionBtn} onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
+          <Ionicons name="create-outline" size={19} color="#7C3AED" />
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.cardActionBtn, s.cardDeleteBtn]} onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} disabled={deleting}>
+          {deleting
+            ? <ActivityIndicator size="small" color="#DC2626" />
+            : <Ionicons name="trash-outline" size={19} color="#DC2626" />
+          }
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  )
+}
+
 function FField({ label, value, onChange, placeholder, keyboardType }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; keyboardType?: any }) {
   return (
     <View style={{ marginBottom: 14 }}>
@@ -292,6 +316,10 @@ const s = StyleSheet.create({
   serviceChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
   svcChip: { fontSize: 11, color: '#7C3AED', backgroundColor: '#F5F3FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20, fontWeight: '600' },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
+  cardInactive: { opacity: 0.6, backgroundColor: '#F9FAFB' },
+  inactiveBadge: { backgroundColor: '#F3F4F6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  inactiveBadgeTxt: { fontSize: 10, fontWeight: '700', color: '#6B7280' },
+  sectionLabel: { fontSize: 12, fontWeight: '700', color: '#9CA3AF', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 16, marginBottom: 8, paddingHorizontal: 4 },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cardActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#F5F3FF', justifyContent: 'center', alignItems: 'center' },
   cardDeleteBtn: { backgroundColor: '#FEF2F2' },
