@@ -8,6 +8,8 @@ import { detectCountry, getPricing } from '@/lib/pricing'
 import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
 import { useTranslation } from 'react-i18next'
+import { usePlanFeatures } from '@/lib/usePlanFeatures'
+import UpgradeOverlay from '@/components/UpgradeOverlay'
 
 type Tab = 'general' | 'services' | 'staff'
 
@@ -15,6 +17,7 @@ export default function Raporlar() {
   const { t } = useTranslation()
   const headerPad = useHeaderPad()
   const router = useRouter()
+  const planFeatures = usePlanFeatures()
   const [tab, setTab] = useState<Tab>('general')
   const [period, setPeriod] = useState('month')
   const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -201,40 +204,75 @@ tbody td{padding:9px 12px;font-size:13px;border-bottom:1px solid #F3F4F6}
               <View style={s.grid}>
                 <ReportCard label={t('nav_appointments')} value={String(stats?.month ?? 0)} iconName="calendar-outline" color="#2563EB" bg="#EFF6FF" />
                 <ReportCard label={t('customers')} value={String(stats?.customersCount ?? 0)} iconName="people-outline" color="#7C3AED" bg="#F5F3FF" />
-                <ReportCard label={t('revenue')} value={`${symbol}${revenue.toLocaleString()}`} iconName="trending-up" color="#059669" bg="#ECFDF5" />
-                <ReportCard label={t('expense')} value={`${symbol}${expense.toLocaleString()}`} iconName="trending-down" color="#DC2626" bg="#FEF2F2" />
+                {planFeatures.hasReports
+                  ? <ReportCard label={t('revenue')} value={`${symbol}${revenue.toLocaleString()}`} iconName="trending-up" color="#059669" bg="#ECFDF5" />
+                  : <ReportCard label={t('revenue')} value="—" iconName="trending-up" color="#9CA3AF" bg="#F3F4F6" locked />
+                }
+                {planFeatures.hasReports
+                  ? <ReportCard label={t('expense')} value={`${symbol}${expense.toLocaleString()}`} iconName="trending-down" color="#DC2626" bg="#FEF2F2" />
+                  : <ReportCard label={t('expense')} value="—" iconName="trending-down" color="#9CA3AF" bg="#F3F4F6" locked />
+                }
               </View>
 
-              <View style={[s.bigCard, { backgroundColor: netProfit >= 0 ? '#ECFDF5' : '#FEF2F2' }]}>
-                <Text style={s.bigCardLabel}>{t('report_net_profit_loss')}</Text>
-                <Text style={[s.bigCardVal, { color: netProfit >= 0 ? '#059669' : '#DC2626' }]}>
-                  {netProfit >= 0 ? '+' : '-'}{symbol}{Math.abs(netProfit).toLocaleString()}
-                </Text>
-                <Text style={s.bigCardSub}>{t('report_profit_margin', { pct: profitMargin })}</Text>
-              </View>
+              {planFeatures.hasReports ? (
+                <>
+                  <View style={[s.bigCard, { backgroundColor: netProfit >= 0 ? '#ECFDF5' : '#FEF2F2' }]}>
+                    <Text style={s.bigCardLabel}>{t('report_net_profit_loss')}</Text>
+                    <Text style={[s.bigCardVal, { color: netProfit >= 0 ? '#059669' : '#DC2626' }]}>
+                      {netProfit >= 0 ? '+' : '-'}{symbol}{Math.abs(netProfit).toLocaleString()}
+                    </Text>
+                    <Text style={s.bigCardSub}>{t('report_profit_margin', { pct: profitMargin })}</Text>
+                  </View>
 
-              <Text style={s.sectionTitle}>{t('report_revenue_expense')}</Text>
-              <View style={s.barCard}>
-                <View style={s.barRow}>
-                  <Text style={s.barLabel}>{t('revenue')}</Text>
-                  <View style={s.barTrack}>
-                    <View style={[s.barFill, { width: '100%', backgroundColor: '#059669' }]} />
+                  <Text style={s.sectionTitle}>{t('report_revenue_expense')}</Text>
+                  <View style={s.barCard}>
+                    <View style={s.barRow}>
+                      <Text style={s.barLabel}>{t('revenue')}</Text>
+                      <View style={s.barTrack}>
+                        <View style={[s.barFill, { width: '100%', backgroundColor: '#059669' }]} />
+                      </View>
+                      <Text style={s.barVal}>{symbol}{revenue.toLocaleString()}</Text>
+                    </View>
+                    <View style={s.barRow}>
+                      <Text style={s.barLabel}>{t('expense')}</Text>
+                      <View style={s.barTrack}>
+                        <View style={[s.barFill, { width: `${revenue > 0 ? Math.min((expense / revenue) * 100, 100) : 0}%` as any, backgroundColor: '#DC2626' }]} />
+                      </View>
+                      <Text style={s.barVal}>{symbol}{expense.toLocaleString()}</Text>
+                    </View>
                   </View>
-                  <Text style={s.barVal}>{symbol}{revenue.toLocaleString()}</Text>
-                </View>
-                <View style={s.barRow}>
-                  <Text style={s.barLabel}>{t('expense')}</Text>
-                  <View style={s.barTrack}>
-                    <View style={[s.barFill, { width: `${revenue > 0 ? Math.min((expense / revenue) * 100, 100) : 0}%` as any, backgroundColor: '#DC2626' }]} />
+                </>
+              ) : (
+                <TouchableOpacity style={s.upgradeBox} onPress={() => router.push('/abonelik' as never)} activeOpacity={0.85}>
+                  <View style={s.upgradeBoxLeft}>
+                    <Ionicons name="lock-closed" size={18} color="#7C3AED" />
+                    <View>
+                      <Text style={s.upgradeBoxTitle}>{t('report_upgrade_title')}</Text>
+                      <Text style={s.upgradeBoxSub}>{t('report_upgrade_sub')}</Text>
+                    </View>
                   </View>
-                  <Text style={s.barVal}>{symbol}{expense.toLocaleString()}</Text>
-                </View>
-              </View>
+                  <View style={s.upgradeBoxBadge}>
+                    <Text style={s.upgradeBoxBadgeTxt}>{t('report_upgrade_cta')}</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
 
             </>
           )}
 
-          {tab === 'services' && (
+          {tab === 'services' && !planFeatures.hasReports && (
+            <View style={s.tabLockWrap}>
+              <UpgradeOverlay
+                requiredPlan={planFeatures.upgradeForReports}
+                icon="bar-chart-outline"
+                title={t('upgrade_report_svc_title')}
+                description={t('upgrade_report_svc_desc')}
+                features={[t('upgrade_report_svc_f1'), t('upgrade_report_svc_f2'), t('upgrade_report_svc_f3')]}
+              />
+            </View>
+          )}
+
+          {tab === 'services' && planFeatures.hasReports && (
             <>
               {services.length === 0 ? (
                 <EmptyState text={t('report_service_no_data')} />
@@ -279,7 +317,19 @@ tbody td{padding:9px 12px;font-size:13px;border-bottom:1px solid #F3F4F6}
             </>
           )}
 
-          {tab === 'staff' && (
+          {tab === 'staff' && !planFeatures.hasReports && (
+            <View style={s.tabLockWrap}>
+              <UpgradeOverlay
+                requiredPlan={planFeatures.upgradeForReports}
+                icon="people-outline"
+                title={t('upgrade_report_staff_title')}
+                description={t('upgrade_report_staff_desc')}
+                features={[t('upgrade_report_staff_f1'), t('upgrade_report_staff_f2'), t('upgrade_report_staff_f3')]}
+              />
+            </View>
+          )}
+
+          {tab === 'staff' && planFeatures.hasReports && (
             <>
               {staff.length === 0 ? (
                 <EmptyState text={t('report_staff_no_data')} />
@@ -337,14 +387,17 @@ tbody td{padding:9px 12px;font-size:13px;border-bottom:1px solid #F3F4F6}
   )
 }
 
-function ReportCard({ label, value, iconName, color, bg }: { label: string; value: string; iconName: string; color: string; bg: string }) {
+function ReportCard({ label, value, iconName, color, bg, locked }: { label: string; value: string; iconName: string; color: string; bg: string; locked?: boolean }) {
   return (
-    <View style={[rc.card, { backgroundColor: '#fff' }]}>
+    <View style={[rc.card, { backgroundColor: '#fff', opacity: locked ? 0.55 : 1 }]}>
       <View style={[rc.icon, { backgroundColor: bg }]}>
-        <Ionicons name={iconName as any} size={22} color={color} />
+        {locked
+          ? <Ionicons name="lock-closed" size={18} color="#9CA3AF" />
+          : <Ionicons name={iconName as any} size={22} color={color} />
+        }
       </View>
       <Text style={rc.label}>{label}</Text>
-      <Text style={[rc.value, { color }]}>{value}</Text>
+      <Text style={[rc.value, { color: locked ? '#9CA3AF' : color }]}>{value}</Text>
     </View>
   )
 }
@@ -426,4 +479,13 @@ const s = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#7C3AED', borderRadius: 14, padding: 16, marginBottom: 20 },
   totalLabel: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)' },
   totalVal: { fontSize: 20, fontWeight: '900', color: '#fff' },
+
+  upgradeBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F3FF', borderRadius: 16, padding: 16, marginHorizontal: 16, marginTop: 12, borderWidth: 1.5, borderColor: '#DDD6FE' },
+  upgradeBoxLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  upgradeBoxTitle: { fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 2 },
+  upgradeBoxSub: { fontSize: 12, color: '#6B7280' },
+  upgradeBoxBadge: { backgroundColor: '#7C3AED', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  upgradeBoxBadgeTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },
+
+  tabLockWrap: { flex: 1, position: 'relative', minHeight: 400 },
 })

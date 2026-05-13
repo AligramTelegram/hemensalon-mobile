@@ -9,20 +9,23 @@ async function getHeaders(): Promise<Record<string, string>> {
     Accept: 'application/json',
   }
 
-  const staffToken = await secureStorage.getItem('staff_token')
-  const mobileTokenPreview = await secureStorage.getItem('mobile_token').catch(() => null)
+  // Staff ve mobile token'ı paralel oku
+  const [staffToken, mobileToken] = await Promise.all([
+    secureStorage.getItem('staff_token'),
+    secureStorage.getItem('mobile_token').catch(() => null),
+  ])
 
   if (__DEV__) {
-    console.log('[api:getHeaders]', {
-      staffTokenPresent: !!staffToken,
-      mobileTokenPresent: !!mobileTokenPreview,
-      hasAuthorizationHeaderBefore: 'Authorization' in headers,
-    })
+    console.log('[api:getHeaders]', { staffTokenPresent: !!staffToken, mobileTokenPresent: !!mobileToken })
   }
 
+  // Staff oturumu: mobile_token (gerçek JWT) kullan, Supabase session'a gerek yok
   if (staffToken) {
-    headers['x-staff-token'] = staffToken
-    if (__DEV__) console.log('[api:getHeaders] using x-staff-token')
+    if (mobileToken) {
+      headers['x-mobile-token'] = mobileToken
+      headers['Authorization'] = `Bearer ${mobileToken}`
+      if (__DEV__) console.log('[api:getHeaders] staff session: using mobile_token as Bearer')
+    }
     return headers
   }
 
@@ -39,16 +42,17 @@ async function getHeaders(): Promise<Record<string, string>> {
 
   let accessToken = session?.access_token
 
-  // Hâlâ token yoksa secureStorage'dan al
-  if (!accessToken) {
-    const stored = await secureStorage.getItem('mobile_token')
-    if (stored) {
-      // Stored token ile session'ı yenilemeyi dene
-      const { data } = await supabase.auth.refreshSession({ refresh_token: stored }).catch(() => ({ data: { session: null } }))
-      accessToken = data.session?.access_token ?? stored
+  // Hâlâ token yoksa önceden okunan mobileToken'ı kullan
+  if (!accessToken && mobileToken) {
+    const refreshToken = await secureStorage.getItem('refresh_token')
+    if (refreshToken) {
+      const { data } = await supabase.auth.refreshSession({ refresh_token: refreshToken }).catch(() => ({ data: { session: null } }))
+      accessToken = data.session?.access_token ?? mobileToken
       if (data.session?.access_token) {
         await secureStorage.setItem('mobile_token', data.session.access_token)
       }
+    } else {
+      accessToken = mobileToken
     }
   }
 
@@ -61,6 +65,21 @@ async function getHeaders(): Promise<Record<string, string>> {
   }
 
   return headers
+}
+
+// ─── Tenant profile cache (route guard'ın her segment değişiminde HTTP yapmasını önler) ──
+let _tenantCache: { data: TenantProfile; ts: number } | null = null
+const TENANT_CACHE_TTL = 2 * 60 * 1000 // 2 dakika
+
+export function getCachedTenant(): TenantProfile | null {
+  if (_tenantCache && Date.now() - _tenantCache.ts < TENANT_CACHE_TTL) return _tenantCache.data
+  return null
+}
+export function setCachedTenant(data: TenantProfile) {
+  _tenantCache = { data, ts: Date.now() }
+}
+export function invalidateTenantCache() {
+  _tenantCache = null
 }
 
 export class PlanLimitError extends Error {
@@ -414,6 +433,22 @@ export type TenantProfile = {
 
 // ── API calls ──────────────────────────────────────────────────────────────
 
+// ── Staff Portal API (uses real Supabase JWT via x-mobile-token) ───────────
+export const staffApi = {
+  appointments: {
+    list: (params?: Record<string, string>) => get<Appointment[]>('/api/staff/appointments', params),
+    update: (id: string, body: Partial<{ status: string; paid: boolean }>) =>
+      put<Appointment>(`/api/staff/appointments/${id}`, body),
+  },
+  customers: {
+    list: (q?: string) => get<Customer[]>('/api/staff/customers', q ? { q } : undefined),
+  },
+  services: {
+    list: () => get<Service[]>('/api/services?all=true'),
+  },
+  me: () => get<{ id: string; name: string; phone?: string; title?: string; color: string; tenant: { name: string; slug: string } }>('/api/staff/me'),
+}
+
 export const api = {
   dashboard: {
     stats: () => get<DashboardStats>('/api/dashboard/stats'),
@@ -443,6 +478,7 @@ export const api = {
     create: (body: { name: string; email?: string; phone?: string; color: string; title?: string; password?: string }) =>
       post<Staff>('/api/staff/create', body),
     update: (id: string, body: Partial<Staff>) => put<Staff>(`/api/staff/${id}`, body),
+    delete: (id: string) => del(`/api/staff/${id}`),
   },
   services: {
     list: () => get<Service[]>('/api/services?all=true'),

@@ -79,40 +79,31 @@ export default function Appointments() {
       const [apts, country] = await Promise.all([api.appointments.list({ date }), detectCountry()])
       setAppointments(apts)
       setSymbol(getPricing(country).symbol)
-    } catch (e: unknown) {
-      console.warn('Failed to load appointments', e)
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
-    }
+    } catch {}
     setLoading(false)
     setRefreshing(false)
-  }, [filterDate, t])
+  }, [filterDate])
 
   useEffect(() => {
     load()
-    api.staff.list().then(setStaffList).catch((e: unknown) => {
-      console.warn('Failed to load staff list', e)
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
-    })
-  }, [load, t])
+    api.staff.list().then(setStaffList).catch(() => {})
+  }, [load])
 
   useEffect(() => {
     if (viewMode !== 'calendar') return
     const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-    Promise.all(
-      Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return api.appointments.list({ date: toISO(d) }) })
-    ).then(results => setWeekApts(results.flat())).catch(() => {})
+    const from = new Date(weekStart)
+    const to = new Date(weekStart); to.setDate(to.getDate() + 6)
+    api.appointments.list({ from: toISO(from), to: toISO(to) }).then(setWeekApts).catch(() => {})
   }, [viewMode, weekStart])
 
   useEffect(() => {
     if (viewMode !== 'month') return
     const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     const year = monthDate.getFullYear(); const month = monthDate.getMonth()
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
-    Promise.all(
-      Array.from({ length: daysInMonth }, (_, i) => {
-        const d = new Date(year, month, i + 1); return api.appointments.list({ date: toISO(d) })
-      })
-    ).then(results => setMonthApts(results.flat())).catch(() => {})
+    const from = new Date(year, month, 1)
+    const to = new Date(year, month + 1, 0)
+    api.appointments.list({ from: toISO(from), to: toISO(to) }).then(setMonthApts).catch(() => {})
   }, [viewMode, monthDate])
 
   const filtered = appointments
@@ -289,7 +280,7 @@ export default function Appointments() {
     setFilterDate(iso); setLoading(true); load(iso)
   }
 
-  const formattedDate = new Date(filterDate + 'T12:00:00').toLocaleDateString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short' })
+  const formattedDate = new Date(filterDate + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
   const isToday = filterDate === todayISO()
 
   return (
@@ -852,8 +843,9 @@ function MonthlyCalendar({ monthDate, appointments, onPrev, onNext, onSelectDay 
   const firstDow = new Date(year, month, 1).getDay() // 0=Sun
   const startOffset = firstDow === 0 ? 6 : firstDow - 1 // convert to Mon-first
   const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7
-  const dayNames = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz']
-  const monthLabel = monthDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+  const { t } = useTranslation()
+  const dayNames = [t('day_mon'),t('day_tue'),t('day_wed'),t('day_thu'),t('day_fri'),t('day_sat'),t('day_sun')]
+  const monthLabel = monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
 
   const aptCounts: Record<string, number> = {}
   appointments.forEach(a => {
@@ -924,9 +916,9 @@ function WeeklyCalendar({ weekStart, appointments, symbol, onPrev, onNext, onSel
   })
   const todayISO = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
   const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-  const dayNames = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz']
+  const dayNames = [t('day_mon'),t('day_tue'),t('day_wed'),t('day_thu'),t('day_fri'),t('day_sat'),t('day_sun')]
 
-  const weekLabel = `${days[0].getDate()} ${days[0].toLocaleDateString('tr-TR',{month:'short'})} – ${days[6].getDate()} ${days[6].toLocaleDateString('tr-TR',{month:'short'})}`
+  const weekLabel = `${days[0].getDate()} ${days[0].toLocaleDateString(undefined,{month:'short'})} – ${days[6].getDate()} ${days[6].toLocaleDateString(undefined,{month:'short'})}`
 
   return (
     <View style={{ flex: 1 }}>
@@ -955,7 +947,7 @@ function WeeklyCalendar({ weekStart, appointments, symbol, onPrev, onNext, onSel
           if (dayApts.length === 0) return null
           return (
             <View key={di} style={{ marginBottom: 16 }}>
-              <Text style={wc.daySection}>{dayNames[di]}, {d.getDate()} {d.toLocaleDateString('tr-TR',{month:'long'})}</Text>
+              <Text style={wc.daySection}>{dayNames[di]}, {d.getDate()} {d.toLocaleDateString(undefined,{month:'long'})}</Text>
               {dayApts.map(a => (
                 <TouchableOpacity key={a.id} style={wc.aptRow} onPress={() => onSelectApt(a)}>
                   <View style={[wc.aptBar, { backgroundColor: a.service.color ?? '#7C3AED' }]} />

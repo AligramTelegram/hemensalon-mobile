@@ -155,11 +155,11 @@ export default function Customers() {
     } catch (e: unknown) {
       if (e instanceof PlanLimitError) {
         Alert.alert(
-          '🔒 Müşteri Limitine Ulaştınız',
+          t('customer_limit_title'),
           e.message,
           [
-            { text: 'Tamam', style: 'cancel' },
-            { text: 'Paketi Yükselt', style: 'default', onPress: () => { setShowModal(false); router.push('/abonelik' as never) } },
+            { text: t('ok'), style: 'cancel' },
+            { text: t('plan_upgrade_btn'), style: 'default', onPress: () => { setShowModal(false); router.push('/abonelik' as never) } },
           ]
         )
       } else {
@@ -209,9 +209,9 @@ export default function Customers() {
   const SEGMENT_OPTIONS: { key: SegmentKey; label: string }[] = [
     { key: 'ALL', label: t('all') },
     { key: 'VIP', label: '⭐ VIP' },
-    { key: 'YENI', label: `🆕 ${t('customer_tagNew')}` },
-    { key: 'KAYIP', label: `🔴 ${t('customer_tagLost')}` },
-    { key: 'RISK', label: `🟠 ${t('customer_tagRisk')}` },
+    { key: 'YENI', label: `🆕 ${t('customer_tagYENI')}` },
+    { key: 'KAYIP', label: `🔴 ${t('customer_tagKAYIP')}` },
+    { key: 'RISK', label: `🟠 ${t('customer_tagRISK')}` },
   ]
   const SORT_OPTIONS: { key: SortKey; label: string }[] = [
     { key: 'name', label: t('name') },

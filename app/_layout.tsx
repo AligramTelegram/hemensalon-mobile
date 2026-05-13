@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { View, ActivityIndicator, I18nManager } from 'react-native';
 import { isRTL } from '@/lib/i18n';
 import * as Notifications from 'expo-notifications';
-import { api } from '@/lib/api';
+import { api, getCachedTenant, setCachedTenant } from '@/lib/api';
 import { initPurchases } from '@/lib/purchases';
 import type { Session } from '@supabase/supabase-js';
 import { ThemeProvider } from '@/lib/theme';
@@ -58,12 +58,15 @@ export default function RootLayout() {
     }
     setup();
 
-    const sub = supabase.auth.onAuthStateChange((_event, s) => {
+    const sub = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
-      if (!s) {
-        // Supabase oturumu kapandığında staff token da temizle
+      // Sadece aktif çıkış yapıldığında staff verilerini temizle
+      // INITIAL_SESSION event'inde temizleme — staff mobile_token ile giriş yaptıysa silinmesin
+      if (event === 'SIGNED_OUT') {
         secureStorage.removeItem('staff_token');
         secureStorage.removeItem('staff_data');
+        secureStorage.removeItem('mobile_token');
+        secureStorage.removeItem('refresh_token');
         setStaffToken(null);
       }
     });
@@ -87,12 +90,20 @@ export default function RootLayout() {
       const inTabs = segments[0] === '(tabs)';
 
       const freshStaffToken = await secureStorage.getItem('staff_token');
-      const isStaffSession = !!freshStaffToken && !session;
-      const loggedIn = !!session || !!freshStaffToken;
+      const freshMobileToken = await secureStorage.getItem('mobile_token');
+      // Staff: staff_token marker var VE mobile_token (gerçek JWT) var
+      const isStaffSession = !!freshStaffToken && !!freshMobileToken;
+      const loggedIn = !!session || isStaffSession;
       const inPaywall = segments[0] === 'deneme-bitti';
 
       if (!loggedIn && !inAuth) {
-        router.replace('/(auth)/login');
+        // İlk kullanıcıya onboarding göster
+        const onboardingDone = await AsyncStorage.getItem('onboarding_done');
+        if (!onboardingDone) {
+          router.replace('/(auth)/onboarding');
+        } else {
+          router.replace('/(auth)/login');
+        }
         return;
       } else if (loggedIn && inAuth) {
         router.replace(isStaffSession ? '/(staff)' : '/(tabs)');
@@ -108,7 +119,12 @@ export default function RootLayout() {
       // Erişim kilidi kontrolü — sadece owner oturumu için
       if (session && !isStaffSession) {
         try {
-          const profile = await api.tenant.get();
+          // Cache'den oku — her segment değişiminde HTTP isteği yapma
+          let profile = getCachedTenant()
+          if (!profile) {
+            profile = await api.tenant.get()
+            setCachedTenant(profile)
+          }
           const now = Date.now();
 
           // Geçerli erişim: aktif trial VEYA aktif ücretli plan
@@ -148,6 +164,7 @@ export default function RootLayout() {
     <ThemeProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)/login" />
+        <Stack.Screen name="(auth)/onboarding" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(staff)" />
         <Stack.Screen name="hizmetler" />

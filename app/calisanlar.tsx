@@ -4,9 +4,8 @@ import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { api, Staff, PlanLimitError } from '@/lib/api'
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { secureStorage } from '@/lib/secureStorage'
 import { useTranslation } from 'react-i18next'
+import { usePlanFeatures } from '@/lib/usePlanFeatures'
 
 const COLORS = ['#7C3AED', '#2563EB', '#059669', '#D97706', '#DC2626', '#0891B2', '#DB2777', '#EA580C']
 
@@ -14,6 +13,7 @@ export default function Calisanlar() {
   const { t } = useTranslation()
   const router = useRouter()
   const headerPad = useHeaderPad()
+  const planFeatures = usePlanFeatures()
   const [staff, setStaff] = useState<Staff[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -23,9 +23,7 @@ export default function Calisanlar() {
   const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
-  const [loginInfo, setLoginInfo] = useState({ salonCode: '', phone: '', pin: '' })
-  const [showPin, setShowPin] = useState(false)
-  const [showLoginSection, setShowLoginSection] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try { setStaff(await api.staff.list()) } catch {}
@@ -37,77 +35,61 @@ export default function Calisanlar() {
   function openCreate() {
     setEditing(null)
     setForm({ name: '', title: '', email: '', phone: '', color: '#7C3AED', password: '' })
-    setLoginInfo({ salonCode: '', phone: '', pin: '' })
-    setShowPin(false)
     setShowPassword(false)
-    setShowLoginSection(false)
     setShowModal(true)
   }
 
-  async function openEdit(st: Staff) {
+  function openEdit(st: Staff) {
     setEditing(st)
     setForm({ name: st.name, title: st.title ?? '', email: st.email ?? '', phone: st.phone ?? '', color: st.color, password: '' })
-    setShowPin(false)
-    setShowLoginSection(false)
-    // Kayıtlı giriş bilgilerini yükle
-    try {
-      const raw = await secureStorage.getItem(`staff_login_${st.id}`)
-      if (raw) {
-        const saved = JSON.parse(raw)
-        setLoginInfo(saved)
-        setShowLoginSection(true)
-      } else {
-        setLoginInfo({ salonCode: '', phone: '', pin: '' })
-      }
-    } catch {
-      setLoginInfo({ salonCode: '', phone: '', pin: '' })
-    }
     setShowModal(true)
+  }
+
+  function handleDelete(st: Staff) {
+    Alert.alert(
+      t('staff_delete_confirm_title'),
+      t('staff_delete_confirm_msg', { name: st.name }),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete'), style: 'destructive', onPress: async () => {
+            setDeleting(st.id)
+            try {
+              await api.staff.delete(st.id)
+              setStaff(prev => prev.filter(s => s.id !== st.id))
+            } catch {
+              Alert.alert(t('error'), t('err_failed'))
+            }
+            setDeleting(null)
+          }
+        },
+      ]
+    )
   }
 
   async function handleSave() {
     if (!form.name) { Alert.alert(t('warning'), t('staff_nameRequired')); return }
-    if (!editing && form.password.length < 6) { Alert.alert(t('warning'), 'Şifre en az 6 karakter olmalı'); return }
-    if (showLoginSection) {
-      if (!loginInfo.salonCode.trim()) { Alert.alert(t('warning'), t('staff_salonCodeRequired')); return }
-      if (!loginInfo.phone.trim()) { Alert.alert(t('warning'), t('staff_phoneRequired')); return }
-      if (loginInfo.pin.length < 4) { Alert.alert(t('warning'), t('staff_pinRequired')); return }
-    }
+    if (!editing && form.password.length < 6) { Alert.alert(t('warning'), t('staff_password_min')); return }
+    if (editing && form.password && form.password.length < 6) { Alert.alert(t('warning'), t('staff_password_min')); return }
     setSaving(true)
     try {
-      const body = { name: form.name, title: form.title || undefined, email: form.email || undefined, phone: form.phone || undefined, color: form.color, ...(!editing && form.password ? { password: form.password } : {}) }
-      let staffId = editing?.id
+      const body = { name: form.name, title: form.title || undefined, email: form.email || undefined, phone: form.phone || undefined, color: form.color, ...(form.password ? { password: form.password } : {}) }
       if (editing) {
         const updated = await api.staff.update(editing.id, body)
         setStaff(prev => prev.map(s => s.id === editing.id ? { ...s, ...updated } : s))
       } else {
-        const created = await api.staff.create(body)
-        staffId = created?.id
+        await api.staff.create(body)
         load()
-      }
-      // Giriş bilgilerini kaydet
-      if (staffId) {
-        const idxRaw = await AsyncStorage.getItem('staff_login_index')
-        const idx: string[] = idxRaw ? JSON.parse(idxRaw) : []
-        if (showLoginSection) {
-          await secureStorage.setItem(`staff_login_${staffId}`, JSON.stringify({ ...loginInfo, name: form.name }))
-          if (!idx.includes(staffId)) {
-            await AsyncStorage.setItem('staff_login_index', JSON.stringify([...idx, staffId]))
-          }
-        } else {
-          await secureStorage.removeItem(`staff_login_${staffId}`)
-          await AsyncStorage.setItem('staff_login_index', JSON.stringify(idx.filter(i => i !== staffId)))
-        }
       }
       setShowModal(false)
     } catch (e: unknown) {
       if (e instanceof PlanLimitError) {
         Alert.alert(
-          '🔒 Personel Limiti Doldu',
+          t('staff_limit_alert_title'),
           e.message,
           [
-            { text: 'Tamam', style: 'cancel' },
-            { text: 'Paketi Yükselt', style: 'default', onPress: () => { setShowModal(false); router.push('/abonelik' as never) } },
+            { text: t('ok'), style: 'cancel' },
+            { text: t('plan_upgrade_btn'), style: 'default', onPress: () => { setShowModal(false); router.push('/abonelik' as never) } },
           ]
         )
       } else {
@@ -126,15 +108,41 @@ export default function Calisanlar() {
           <TouchableOpacity onPress={() => router.back()} style={s.back}>
             <Ionicons name="chevron-back" size={26} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity style={s.addBtn} onPress={openCreate}>
-            <Ionicons name="add" size={16} color="#7C3AED" />
-            <Text style={s.addTxt}>{t('new')}</Text>
+          <TouchableOpacity
+            style={[s.addBtn, staff.length >= planFeatures.maxStaff && { backgroundColor: '#E5E7EB' }]}
+            onPress={() => {
+              if (staff.length >= planFeatures.maxStaff) {
+                router.push('/abonelik' as never)
+              } else {
+                openCreate()
+              }
+            }}
+          >
+            {staff.length >= planFeatures.maxStaff
+              ? <Ionicons name="lock-closed" size={14} color="#9CA3AF" />
+              : <Ionicons name="add" size={16} color="#7C3AED" />
+            }
+            <Text style={[s.addTxt, staff.length >= planFeatures.maxStaff && { color: '#9CA3AF' }]}>
+              {staff.length >= planFeatures.maxStaff ? t('menu_upgrade') : t('new')}
+            </Text>
           </TouchableOpacity>
         </View>
         <Text style={s.headerTitle}>{t('staff_title')}</Text>
         <Text style={s.headerSub}>{t('staff_count', { count: staff.length })}</Text>
       </View>
       <View style={s.headerCurve} />
+
+      {/* Plan limit uyarısı */}
+      {!planFeatures.loading && staff.length >= planFeatures.maxStaff && (
+        <TouchableOpacity style={s.limitBanner} onPress={() => router.push('/abonelik' as never)} activeOpacity={0.85}>
+          <Ionicons name="lock-closed" size={16} color="#D97706" />
+          <View style={{ flex: 1 }}>
+            <Text style={s.limitBannerTitle}>{t('staff_limit_title', { current: staff.length, max: planFeatures.maxStaff })}</Text>
+            <Text style={s.limitBannerSub}>{t('staff_limit_sub')}</Text>
+          </View>
+          <View style={s.limitBannerBadge}><Text style={s.limitBannerBadgeTxt}>{t('sub_upgrade_btn')}</Text></View>
+        </TouchableOpacity>
+      )}
 
       {/* Arama */}
       <View style={s.searchWrap}>
@@ -161,7 +169,7 @@ export default function Calisanlar() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}
           ListEmptyComponent={<Text style={s.empty}>{t('staff_empty')}</Text>}
           renderItem={({ item }) => (
-            <TouchableOpacity style={s.card} onPress={() => router.push(`/personel/${item.id}` as never)} onLongPress={() => openEdit(item)}>
+            <TouchableOpacity style={s.card} onPress={() => router.push(`/personel/${item.id}` as never)} activeOpacity={0.85}>
               <View style={[s.avatar, { backgroundColor: item.color }]}>
                 <Text style={s.avatarTxt}>{item.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}</Text>
               </View>
@@ -177,7 +185,17 @@ export default function Calisanlar() {
                   </View>
                 )}
               </View>
-              <View style={[s.statusDot, { backgroundColor: item.isActive ? '#059669' : '#9CA3AF' }]} />
+              <View style={s.cardActions}>
+                <TouchableOpacity style={s.cardActionBtn} onPress={() => openEdit(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
+                  <Ionicons name="create-outline" size={19} color="#7C3AED" />
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.cardActionBtn, s.cardDeleteBtn]} onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} disabled={deleting === item.id}>
+                  {deleting === item.id
+                    ? <ActivityIndicator size="small" color="#DC2626" />
+                    : <Ionicons name="trash-outline" size={19} color="#DC2626" />
+                  }
+                </TouchableOpacity>
+              </View>
             </TouchableOpacity>
           )}
         />
@@ -195,25 +213,23 @@ export default function Calisanlar() {
             <FField label={`${t('name')} *`} value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder={t('staff_namePlaceholder')} />
             <FField label={t('title')} value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder={t('staff_titlePlaceholder')} />
             <FField label={t('email')} value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="ornek@mail.com" keyboardType="email-address" />
-            {!editing && (
-              <View style={{ marginBottom: 14 }}>
-                <Text style={s.fieldLabel}>Şifre *</Text>
-                <View style={s.pinRow}>
-                  <TextInput
-                    style={[s.input, { flex: 1 }]}
-                    value={form.password}
-                    onChangeText={v => setForm(f => ({ ...f, password: v }))}
-                    placeholder="En az 6 karakter"
-                    placeholderTextColor="#9CA3AF"
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity style={s.pinEye} onPress={() => setShowPassword(v => !v)}>
-                    <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6B7280" />
-                  </TouchableOpacity>
-                </View>
+            <View style={{ marginBottom: 14 }}>
+              <Text style={s.fieldLabel}>{editing ? t('staff_password_change_label') : t('staff_password_label')}</Text>
+              <View style={s.pinRow}>
+                <TextInput
+                  style={[s.input, { flex: 1 }]}
+                  value={form.password}
+                  onChangeText={v => setForm(f => ({ ...f, password: v }))}
+                  placeholder={editing ? t('staff_password_change_placeholder') : t('staff_password_placeholder')}
+                  placeholderTextColor="#9CA3AF"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity style={s.pinEye} onPress={() => setShowPassword(v => !v)}>
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6B7280" />
+                </TouchableOpacity>
               </View>
-            )}
+            </View>
             <FField label={t('phone')} value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} placeholder="05XX XXX XX XX" keyboardType="phone-pad" />
 
             <Text style={s.fieldLabel}>{t('color')}</Text>
@@ -225,70 +241,6 @@ export default function Calisanlar() {
                 </TouchableOpacity>
               ))}
             </View>
-
-            {/* Giriş Bilgileri */}
-            <TouchableOpacity style={s.loginToggle} onPress={() => setShowLoginSection(v => !v)}>
-              <View style={s.loginToggleLeft}>
-                <Ionicons name="key-outline" size={18} color="#7C3AED" />
-                <Text style={s.loginToggleTxt}>{t('staff_loginInfo')}</Text>
-              </View>
-              <Ionicons name={showLoginSection ? 'chevron-up' : 'chevron-down'} size={18} color="#7C3AED" />
-            </TouchableOpacity>
-
-            {showLoginSection && (
-              <View style={s.loginBox}>
-                <View style={s.loginInfoBanner}>
-                  <Ionicons name="information-circle-outline" size={15} color="#2563EB" />
-                  <Text style={s.loginInfoTxt}>{t('staff_loginBanner')}</Text>
-                </View>
-                <View style={{ marginBottom: 14 }}>
-                  <Text style={s.fieldLabel}>{t('staff_salonCode')}</Text>
-                  <TextInput
-                    style={s.input}
-                    value={loginInfo.salonCode}
-                    onChangeText={v => setLoginInfo(f => ({ ...f, salonCode: v }))}
-                    placeholder="SALON01"
-                    placeholderTextColor="#9CA3AF"
-                    autoCapitalize="characters"
-                  />
-                </View>
-                <View style={{ marginBottom: 14 }}>
-                  <Text style={s.fieldLabel}>{t('staff_staffPhone')}</Text>
-                  <TextInput
-                    style={s.input}
-                    value={loginInfo.phone}
-                    onChangeText={v => setLoginInfo(f => ({ ...f, phone: v }))}
-                    placeholder="05XX XXX XX XX"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="phone-pad"
-                  />
-                </View>
-                <View style={{ marginBottom: 14 }}>
-                  <Text style={s.fieldLabel}>{t('staff_pin')}</Text>
-                  <View style={s.pinRow}>
-                    <TextInput
-                      style={[s.input, { flex: 1 }]}
-                      value={loginInfo.pin}
-                      onChangeText={v => setLoginInfo(f => ({ ...f, pin: v.replace(/\D/g, '').slice(0, 6) }))}
-                      placeholder="••••"
-                      placeholderTextColor="#9CA3AF"
-                      keyboardType="number-pad"
-                      secureTextEntry={!showPin}
-                      maxLength={6}
-                    />
-                    <TouchableOpacity style={s.pinEye} onPress={() => setShowPin(v => !v)}>
-                      <Ionicons name={showPin ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6B7280" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                <View style={s.loginSummary}>
-                  <Ionicons name="person-circle-outline" size={16} color="#059669" />
-                  <Text style={s.loginSummaryTxt}>
-                    {t('staff_loginSummary')}: {loginInfo.salonCode || '?'} / {loginInfo.phone || '?'} / {loginInfo.pin ? '●'.repeat(loginInfo.pin.length) : '?'}
-                  </Text>
-                </View>
-              </View>
-            )}
 
             <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={saving}>
               {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveTxt}>{editing ? t('update') : t('staff_add')}</Text>}
@@ -323,6 +275,11 @@ const s = StyleSheet.create({
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.7)' },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
   addTxt: { color: '#7C3AED', fontWeight: '700', fontSize: 13 },
+  limitBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFBEB', marginHorizontal: 12, marginTop: 8, borderRadius: 14, padding: 14, borderWidth: 1.5, borderColor: '#FDE68A' },
+  limitBannerTitle: { fontSize: 13, fontWeight: '700', color: '#92400E' },
+  limitBannerSub: { fontSize: 11, color: '#B45309', marginTop: 1 },
+  limitBannerBadge: { backgroundColor: '#D97706', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
+  limitBannerBadgeTxt: { color: '#fff', fontSize: 11, fontWeight: '800' },
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', margin: 12, marginBottom: 4, borderRadius: 14, paddingHorizontal: 14, borderWidth: 1.5, borderColor: '#E5E7EB', height: 44 },
   searchInput: { flex: 1, fontSize: 14, color: '#111827' },
   empty: { textAlign: 'center', color: '#9CA3AF', paddingVertical: 48, fontSize: 14 },
@@ -335,6 +292,9 @@ const s = StyleSheet.create({
   serviceChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
   svcChip: { fontSize: 11, color: '#7C3AED', backgroundColor: '#F5F3FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20, fontWeight: '600' },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cardActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#F5F3FF', justifyContent: 'center', alignItems: 'center' },
+  cardDeleteBtn: { backgroundColor: '#FEF2F2' },
   modal: { flex: 1, backgroundColor: '#F9FAFB' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: Platform.OS === 'ios' ? 56 : 20, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   modalTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
@@ -347,14 +307,6 @@ const s = StyleSheet.create({
   colorDotActive: { transform: [{ scale: 1.15 }] },
   saveBtn: { backgroundColor: '#7C3AED', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   saveTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  loginToggle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F5F3FF', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1.5, borderColor: '#DDD6FE' },
-  loginToggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  loginToggleTxt: { fontSize: 14, fontWeight: '700', color: '#7C3AED' },
-  loginBox: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1.5, borderColor: '#E5E7EB' },
-  loginInfoBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EFF6FF', borderRadius: 8, padding: 10, marginBottom: 14 },
-  loginInfoTxt: { fontSize: 12, color: '#2563EB', flex: 1 },
   pinRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pinEye: { width: 48, height: 48, backgroundColor: '#F3F4F6', borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB' },
-  loginSummary: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F0FDF4', borderRadius: 8, padding: 10 },
-  loginSummaryTxt: { fontSize: 12, color: '#059669', fontWeight: '600' },
 })

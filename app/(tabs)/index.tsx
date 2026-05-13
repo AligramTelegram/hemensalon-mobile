@@ -54,6 +54,7 @@ export default function Dashboard() {
   const pulseAnim = useRef(new Animated.Value(0.4)).current
   const spinAnim = useRef(new Animated.Value(0)).current
   const autoRefreshLoop = useRef<ReturnType<typeof Animated.loop> | null>(null)
+  const lastLoadedAt = useRef<number>(0)
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -93,7 +94,7 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [data, country, { data: { user } }, products, usageData, notifs, readIdsRaw] = await Promise.all([
+      const [data, country, { data: { user } }, products, usageData, notifs, readIdsRaw, allCustomers] = await Promise.all([
         api.dashboard.stats(),
         detectCountry(),
         supabase.auth.getUser(),
@@ -101,6 +102,7 @@ export default function Dashboard() {
         api.tenant.usage().catch(() => null),
         api.notifications.list().catch(() => []),
         AsyncStorage.getItem('read_notification_ids').catch(() => null),
+        api.customers.list().catch(() => [] as Customer[]),
       ])
       setStats(data)
       setUsage(usageData)
@@ -110,21 +112,16 @@ export default function Dashboard() {
       const readIds: Set<string> = readIdsRaw ? new Set(JSON.parse(readIdsRaw)) : new Set()
       setUnreadNotifCount(notifs.filter(n => n.isNew && !readIds.has(n.id)).length)
 
-      // Doğum günü kontrolü (bugün + 7 gün)
-      try {
-        const allCustomers = await api.customers.list()
-        const today = new Date()
-        const upcoming = allCustomers.filter(c => {
-          if (!c.birthday) return false
-          const bd = new Date(c.birthday)
-          const thisYear = new Date(today.getFullYear(), bd.getMonth(), bd.getDate())
-          const diff = (thisYear.getTime() - today.getTime()) / 86400000
-          return diff >= 0 && diff <= 7
-        })
-        setBirthdayCustomers(upcoming)
-      } catch (e: unknown) {
-        console.warn('Failed to load birthday customers', e)
-      }
+      const today = new Date()
+      const upcoming = allCustomers.filter(c => {
+        if (!c.birthday) return false
+        const bd = new Date(c.birthday)
+        const thisYear = new Date(today.getFullYear(), bd.getMonth(), bd.getDate())
+        const diff = (thisYear.getTime() - today.getTime()) / 86400000
+        return diff >= 0 && diff <= 7
+      })
+      setBirthdayCustomers(upcoming)
+      lastLoadedAt.current = Date.now()
     } catch (e: unknown) {
       console.warn('Failed to load dashboard', e)
       Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
@@ -147,10 +144,11 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [load, startSpinAnim, stopSpinAnim])
 
-  // Sayfaya odaklanınca yenile (sekme değişimi, geri geliş)
+  // Sayfaya odaklanınca yenile — ama son yüklemeden 90 saniye geçmediyse atlat
+  const FOCUS_STALE_MS = 90_000
   useFocusEffect(
     useCallback(() => {
-      if (!loading) {
+      if (!loading && Date.now() - lastLoadedAt.current > FOCUS_STALE_MS) {
         setAutoRefreshing(true)
         startSpinAnim()
         load().then(() => {
@@ -285,7 +283,7 @@ export default function Dashboard() {
           <View style={s.heroDateRow}>
             <Ionicons name="calendar-outline" size={13} color="rgba(255,255,255,0.65)" />
             <Text style={s.heroDateTxt}>
-              {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </Text>
           </View>
 
@@ -372,11 +370,11 @@ export default function Dashboard() {
         {usage && (() => {
           const items: { label: string; pct: number; icon: string }[] = []
           if (usage.maxAppointmentsPerMonth && usage.pct.appointments >= 80)
-            items.push({ label: 'Randevu', pct: usage.pct.appointments, icon: 'calendar-outline' })
+            items.push({ label: t('quick_appointment'), pct: usage.pct.appointments, icon: 'calendar-outline' })
           if (usage.maxCustomers && usage.pct.customers >= 80)
-            items.push({ label: 'Müşteri', pct: usage.pct.customers, icon: 'people-outline' })
+            items.push({ label: t('quick_customer'), pct: usage.pct.customers, icon: 'people-outline' })
           if (usage.maxStaff && usage.pct.staff >= 100)
-            items.push({ label: 'Personel', pct: usage.pct.staff, icon: 'person-outline' })
+            items.push({ label: t('quick_staff'), pct: usage.pct.staff, icon: 'person-outline' })
           if (items.length === 0) return null
           const isFull = items.some(i => i.pct >= 100)
           const accent = isFull ? '#DC2626' : '#D97706'
@@ -393,7 +391,7 @@ export default function Dashboard() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.limitCardTitle, { color: accent }]}>
-                  {isFull ? 'Plan limitine ulaştınız' : 'Limite yaklaşıyorsunuz'}
+                  {isFull ? t('plan_limit_reached') : t('plan_limit_near')}
                 </Text>
                 <View style={{ gap: 6, marginTop: 8 }}>
                   {items.map(item => (
@@ -412,7 +410,7 @@ export default function Dashboard() {
                   ))}
                 </View>
                 <View style={s.limitCardFooter}>
-                  <Text style={[s.limitCardUpgrade, { color: accent }]}>Paketi yükselt</Text>
+                  <Text style={[s.limitCardUpgrade, { color: accent }]}>{t('plan_upgrade_btn')}</Text>
                   <Ionicons name="arrow-forward" size={12} color={accent} />
                 </View>
               </View>

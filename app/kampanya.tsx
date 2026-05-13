@@ -2,10 +2,12 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 
 export default function Kampanya() {
   const headerPad = useHeaderPad()
   const router = useRouter()
+  const { t } = useTranslation()
 
   return (
     <View style={s.root}>
@@ -18,8 +20,8 @@ export default function Kampanya() {
             <Ionicons name="arrow-back" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
-        <Text style={s.heroTitle}>Kampanyalar</Text>
-        <Text style={s.heroSub}>Müşterilerinize toplu mesaj gönderin</Text>
+        <Text style={s.heroTitle}>{t('campaign_title')}</Text>
+        <Text style={s.heroSub}>{t('campaign_sub')}</Text>
       </View>
       <View style={s.heroCurve} />
 
@@ -43,13 +45,10 @@ export default function Kampanya() {
           <View style={s.lockIconWrap}>
             <Ionicons name="rocket-outline" size={36} color="#2563EB" />
           </View>
-          <Text style={s.lockTitle}>Yakında Geliyor</Text>
-          <Text style={s.lockSub}>
-            Kampanya modülü çok yakında kullanıma açılıyor.{'\n'}
-            Müşterilerinize segmentlere göre toplu mesaj gönderebileceksiniz.
-          </Text>
+          <Text style={s.lockTitle}>{t('coming_soon_title')}</Text>
+          <Text style={s.lockSub}>{t('campaign_coming_desc')}</Text>
           <View style={s.featureList}>
-            {['VIP müşterilere özel teklif', 'Kayıp müşteri geri kazanma', 'Doğum günü kampanyaları'].map(f => (
+            {[t('campaign_f1'), t('campaign_f2'), t('campaign_f3')].map(f => (
               <View key={f} style={s.featureRow}>
                 <Ionicons name="checkmark-circle" size={16} color="#2563EB" />
                 <Text style={s.featureTxt}>{f}</Text>
@@ -57,7 +56,7 @@ export default function Kampanya() {
             ))}
           </View>
           <TouchableOpacity style={s.backBtn2} onPress={() => router.back()}>
-            <Text style={s.backBtn2Txt}>Geri Dön</Text>
+            <Text style={s.backBtn2Txt}>{t('go_back')}</Text>
           </TouchableOpacity>
         </View>
       </View>

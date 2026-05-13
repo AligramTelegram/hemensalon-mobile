@@ -2,10 +2,12 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 
 export default function Promosyon() {
   const headerPad = useHeaderPad()
   const router = useRouter()
+  const { t } = useTranslation()
 
   return (
     <View style={s.root}>
@@ -18,8 +20,8 @@ export default function Promosyon() {
             <Ionicons name="arrow-back" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
-        <Text style={s.heroTitle}>Promosyonlar</Text>
-        <Text style={s.heroSub}>İndirim kodu oluşturun ve yönetin</Text>
+        <Text style={s.heroTitle}>{t('promo_title')}</Text>
+        <Text style={s.heroSub}>{t('promo_sub')}</Text>
       </View>
       <View style={s.heroCurve} />
 
@@ -43,13 +45,10 @@ export default function Promosyon() {
           <View style={s.lockIconWrap}>
             <Ionicons name="pricetag-outline" size={36} color="#DC2626" />
           </View>
-          <Text style={s.lockTitle}>Yakında Geliyor</Text>
-          <Text style={s.lockSub}>
-            Promosyon kodu sistemi çok yakında aktif olacak.{'\n'}
-            Müşterilerinize özel indirim kodları oluşturabileceksiniz.
-          </Text>
+          <Text style={s.lockTitle}>{t('coming_soon_title')}</Text>
+          <Text style={s.lockSub}>{t('promo_coming_desc')}</Text>
           <View style={s.featureList}>
-            {['Yüzde veya sabit indirim', 'Kullanım limiti belirleme', 'Son kullanma tarihi ayarlama'].map(f => (
+            {[t('promo_f1'), t('promo_f2'), t('promo_f3')].map(f => (
               <View key={f} style={s.featureRow}>
                 <Ionicons name="checkmark-circle" size={16} color="#DC2626" />
                 <Text style={s.featureTxt}>{f}</Text>
@@ -57,7 +56,7 @@ export default function Promosyon() {
             ))}
           </View>
           <TouchableOpacity style={s.backBtn2} onPress={() => router.back()}>
-            <Text style={s.backBtn2Txt}>Geri Dön</Text>
+            <Text style={s.backBtn2Txt}>{t('go_back')}</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -62,8 +62,6 @@ const PLANS: PlanDef[] = [
   },
 ]
 
-const BILLING_PORTAL_URL = process.env.EXPO_PUBLIC_BILLING_URL ?? 'https://app.hemensalon.com/billing'
-
 export default function Abonelik() {
   const { t } = useTranslation()
   const router = useRouter()
@@ -95,16 +93,16 @@ export default function Abonelik() {
     getOfferings().then(setPackages)
   }, [load])
 
-  function handleManageBilling() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    Linking.openURL(BILLING_PORTAL_URL)
-  }
-
-  async function handleUpgrade(planKey: string) {
+async function handleUpgrade(planKey: string) {
     if (planKey === profile?.plan) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
 
-    const pkgId = planKey.toLowerCase() + '_monthly'
+    const PLAN_TO_PACKAGE: Record<string, string> = {
+      BASLANGIC:   '$rc_monthly',
+      PROFESYONEL: '$rc_annual',
+      ISLETME:     '$rc_lifetime',
+    }
+    const pkgId = PLAN_TO_PACKAGE[planKey]
     const pkg = packages.find(p => p.identifier === pkgId)
 
     if (pkg) {
@@ -126,7 +124,7 @@ export default function Abonelik() {
         t('sub_change_plan_msg', { label: planLabel }),
         [
           { text: t('cancel'), style: 'cancel' },
-          { text: t('continue'), onPress: () => Linking.openURL(BILLING_PORTAL_URL) },
+          { text: t('ok'), style: 'cancel' },
         ]
       )
     }
@@ -203,7 +201,7 @@ export default function Abonelik() {
                 </Text>
                 <View style={[s.trialDaysBadge, trial.isSubscriptionActive && { backgroundColor: '#D1FAE5', borderColor: '#A7F3D0' }]}>
                   <Text style={[s.trialDaysTxt, trial.isSubscriptionActive && { color: '#059669' }]}>
-                    {t('sub_time_left', { val: trial.daysLeft > 0 ? `${trial.daysLeft} gün` : `${trial.hoursLeft} saat` })}
+                    {t('sub_time_left', { val: trial.daysLeft > 0 ? `${trial.daysLeft} ${t('time_day')}` : `${trial.hoursLeft} ${t('time_hour')}` })}
                   </Text>
                 </View>
               </View>
@@ -238,18 +236,6 @@ export default function Abonelik() {
             </View>
           )}
 
-          <TouchableOpacity style={s.billingBtn} onPress={handleManageBilling} activeOpacity={0.85}>
-            <View style={s.billingBtnLeft}>
-              <View style={[s.billingIcon, { backgroundColor: currentPlan.bg }]}>
-                <Ionicons name="card-outline" size={20} color={currentPlan.color} />
-              </View>
-              <View>
-                <Text style={s.billingBtnTitle}>{t('sub_billing_title')}</Text>
-                <Text style={s.billingBtnSub}>{t('sub_billing_sub')}</Text>
-              </View>
-            </View>
-            <Ionicons name="open-outline" size={16} color="#9CA3AF" />
-          </TouchableOpacity>
 
           <Text style={s.sectionTitle2}>{t('sub_plans_title')}</Text>
           {PLANS.map(plan => {

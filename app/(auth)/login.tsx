@@ -9,7 +9,6 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { supabase } from '@/lib/supabase'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { secureStorage } from '@/lib/secureStorage'
 import { useTranslation } from 'react-i18next'
 
@@ -56,10 +55,9 @@ export default function Login() {
   const [agreed, setAgreed] = useState(false)
 
   // Personel girişi
-  const [staffSalon, setStaffSalon] = useState('')
-  const [staffPhone, setStaffPhone] = useState('')
-  const [staffPin, setStaffPin] = useState('')
-  const [showStaffPin, setShowStaffPin] = useState(false)
+  const [staffEmail, setStaffEmail] = useState('')
+  const [staffPassword, setStaffPassword] = useState('')
+  const [showStaffPass, setShowStaffPass] = useState(false)
 
   async function handleSubmit() {
     if (mode === 'forgot') {
@@ -133,45 +131,34 @@ export default function Login() {
   }
 
   async function handleStaffLogin() {
-    if (!staffSalon.trim() || !staffPhone.trim() || !staffPin.trim()) {
+    if (!staffEmail.trim() || !staffPassword.trim()) {
       Alert.alert(t('warning'), t('auth_fillAll'))
       return
     }
     setLoading(true)
     try {
-      const staffIdListRaw = await AsyncStorage.getItem('staff_login_index')
-      const staffIds: string[] = staffIdListRaw ? JSON.parse(staffIdListRaw) : []
-
-      let matched: { staffId: string; salonCode: string; phone: string; pin: string } | null = null
-      for (const staffId of staffIds) {
-        const val = await secureStorage.getItem(`staff_login_${staffId}`)
-        if (!val) continue
-        try {
-          const entry = JSON.parse(val)
-          if (
-            entry.salonCode?.trim().toUpperCase() === staffSalon.trim().toUpperCase() &&
-            entry.phone?.trim() === staffPhone.trim() &&
-            entry.pin === staffPin
-          ) {
-            matched = { staffId, ...entry }
-            break
-          }
-        } catch {}
-      }
-
-      if (!matched) {
-        Alert.alert(t('auth_loginError'), t('auth_invalidStaff'))
+      const res = await fetch(`${BASE}/api/auth/staff-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: staffEmail.trim(), password: staffPassword }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        Alert.alert(t('auth_loginError'), data?.error ?? t('auth_invalidStaff'))
         setLoading(false)
         return
       }
-
-      await secureStorage.setItem('staff_token', `staff-${matched.staffId}`)
+      // Store real Supabase JWT as mobile_token (staff routes use x-mobile-token)
+      await secureStorage.setItem('mobile_token', data.access_token)
+      if (data.refresh_token) {
+        await secureStorage.setItem('refresh_token', data.refresh_token)
+      }
+      // staff_token = marker: layout staff tespiti için kullanılıyor
+      await secureStorage.setItem('staff_token', 'staff')
       await secureStorage.setItem('staff_data', JSON.stringify({
-        name: (matched as any).name || staffPhone.trim(),
+        name: data.name,
         role: 'staff',
-        staffId: matched.staffId,
-        salonCode: matched.salonCode,
-        phone: staffPhone.trim(),
+        staffId: data.staffId,
       }))
       router.replace('/(staff)')
     } catch {
@@ -327,7 +314,7 @@ export default function Login() {
         showsVerticalScrollIndicator={false}
       >
         {/* Geri */}
-        <TouchableOpacity style={s.backBtn} onPress={() => { setMode('landing'); setEmail(''); setPassword(''); setBusinessName(''); setStaffSalon(''); setStaffPhone(''); setStaffPin('') }}>
+        <TouchableOpacity style={s.backBtn} onPress={() => { setMode('landing'); setEmail(''); setPassword(''); setBusinessName(''); setStaffEmail(''); setStaffPassword('') }}>
           <Ionicons name="chevron-back" size={20} color="#fff" />
           <Text style={s.backBtnTxt}>{t('back')}</Text>
         </TouchableOpacity>
@@ -352,35 +339,24 @@ export default function Login() {
               <Text style={s.cardSub}>{t('auth_staffLoginDesc')}</Text>
 
               <InputField
-                icon="storefront-outline"
-                placeholder={t('auth_salonCodePlaceholder')}
-                value={staffSalon}
-                onChange={setStaffSalon}
+                icon="mail-outline"
+                placeholder={t('auth_emailPlaceholder')}
+                value={staffEmail}
+                onChange={setStaffEmail}
+                keyboardType="email-address"
               />
               <InputField
-                icon="call-outline"
-                placeholder={t('phone')}
-                value={staffPhone}
-                onChange={setStaffPhone}
-                keyboardType="phone-pad"
-              />
-              <InputField
-                icon="keypad-outline"
-                placeholder={t('auth_pinPlaceholder')}
-                value={staffPin}
-                onChange={v => setStaffPin(v.replace(/\D/g, '').slice(0, 4))}
-                secureEntry={!showStaffPin}
+                icon="lock-closed-outline"
+                placeholder={t('auth_passwordPlaceholder')}
+                value={staffPassword}
+                onChange={setStaffPassword}
+                secureEntry={!showStaffPass}
                 right={
-                  <TouchableOpacity onPress={() => setShowStaffPin(v => !v)} style={s.eyeBtn}>
-                    <Ionicons name={showStaffPin ? 'eye-off-outline' : 'eye-outline'} size={18} color="#9CA3AF" />
+                  <TouchableOpacity onPress={() => setShowStaffPass(v => !v)} style={s.eyeBtn}>
+                    <Ionicons name={showStaffPass ? 'eye-off-outline' : 'eye-outline'} size={18} color="#9CA3AF" />
                   </TouchableOpacity>
                 }
               />
-
-              <View style={s.staffInfoBox}>
-                <Ionicons name="information-circle-outline" size={15} color="#6B7280" />
-                <Text style={s.staffInfoTxt}>{t('auth_staff_pin_info')}</Text>
-              </View>
 
               <SubmitBtn loading={loading} label={t('auth_staffLoginBtn')} onPress={handleStaffLogin} />
 

@@ -83,7 +83,7 @@ export default function Bildirimler() {
           </TouchableOpacity>
           {newNotifs.length > 0 && (
             <View style={s.headerBadge}>
-              <Text style={s.headerBadgeTxt}>{newNotifs.length} yeni</Text>
+              <Text style={s.headerBadgeTxt}>{t('notif_new_badge', { count: newNotifs.length })}</Text>
             </View>
           )}
         </View>

@@ -16,6 +16,7 @@ import {
 } from '@/lib/purchases'
 import type { PurchasesPackage } from 'react-native-purchases'
 import { useTranslation } from 'react-i18next'
+import { detectCountry, getPricing, formatPrice } from '@/lib/pricing'
 
 type PlanMeta = {
   labelKey: string; color: string; bg: string
@@ -51,6 +52,7 @@ export default function DenemeBitti() {
   const [purchasing, setPurchasing]   = useState<string | null>(null)
   const [restoring, setRestoring]     = useState(false)
   const [preferredPlanId, setPreferredPlanId] = useState<string | null>(null)
+  const [pricing, setPricing] = useState<ReturnType<typeof getPricing> | null>(null)
 
   const pulse  = useRef(new Animated.Value(1)).current
   const fadeIn = useRef(new Animated.Value(0)).current
@@ -73,6 +75,7 @@ export default function DenemeBitti() {
       Animated.timing(pulse, { toValue: 1,    duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
     ])).start()
     AsyncStorage.getItem('selected_plan').then(p => { if (p) setPreferredPlanId(p) })
+    detectCountry().then(c => setPricing(getPricing(c)))
     loadPackages()
   }, [])
 
@@ -242,12 +245,58 @@ export default function DenemeBitti() {
               </View>
             )
           })
-        ) : (
-          <View style={s.notConfigured}>
-            <Ionicons name="construct-outline" size={24} color="#9CA3AF" />
-            <Text style={s.notConfiguredTxt}>{t('trial_not_configured')}</Text>
-          </View>
-        )}
+        ) : pricing ? (
+          // RevenueCat yokken fiyat listesi göster
+          [
+            { key: 'BASLANGIC', labelKey: 'plan_BASLANGIC_label', color: '#2563EB', bg: '#EFF6FF', icon: 'rocket-outline' as const, featureKeys: ['plan_BASLANGIC_f1','plan_BASLANGIC_f2','plan_BASLANGIC_f3'] },
+            { key: 'PROFESYONEL', labelKey: 'plan_PROFESYONEL_label', color: '#7C3AED', bg: '#EDE9FE', icon: 'flash-outline' as const, popular: true, featureKeys: ['plan_PROFESYONEL_f1','plan_PROFESYONEL_f2','plan_PROFESYONEL_f3'] },
+            { key: 'ISLETME', labelKey: 'plan_ISLETME_label', color: '#D97706', bg: '#FEF3C7', icon: 'business-outline' as const, featureKeys: ['plan_ISLETME_f1','plan_ISLETME_f2','plan_ISLETME_f3'] },
+          ].map(plan => {
+            const price = pricing[plan.key as keyof typeof pricing]
+            const isPreferred = preferredPlanId === plan.key.toLowerCase() + '_monthly'
+            return (
+              <View key={plan.key} style={[s.planCard, (plan.popular || isPreferred) && { borderColor: plan.color, borderWidth: 2 }]}>
+                {isPreferred ? (
+                  <View style={[s.popularBadge, { backgroundColor: plan.color }]}>
+                    <Ionicons name="star" size={10} color="#fff" />
+                    <Text style={s.popularTxt}>{t('sub_selected_plan')}</Text>
+                  </View>
+                ) : plan.popular ? (
+                  <View style={[s.popularBadge, { backgroundColor: plan.color }]}>
+                    <Ionicons name="star" size={10} color="#fff" />
+                    <Text style={s.popularTxt}>{t('trial_most_popular')}</Text>
+                  </View>
+                ) : null}
+                <View style={s.planTop}>
+                  <View style={[s.planIcon, { backgroundColor: plan.bg }]}>
+                    <Ionicons name={plan.icon} size={22} color={plan.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.planName}>{t(plan.labelKey)}</Text>
+                    <Text style={[s.planPrice, { color: plan.color }]}>
+                      {formatPrice(price, pricing.currency)}<Text style={s.planPer}>/ay</Text>
+                    </Text>
+                  </View>
+                </View>
+                <View style={s.featList}>
+                  {plan.featureKeys.map(fk => (
+                    <View key={fk} style={s.featRow}>
+                      <View style={[s.featDot, { backgroundColor: plan.color }]} />
+                      <Text style={s.featTxt}>{t(fk)}</Text>
+                    </View>
+                  ))}
+                </View>
+                <TouchableOpacity
+                  style={[s.buyBtn, { backgroundColor: plan.color }]}
+                  onPress={() => Alert.alert(t('sub_store_title'), t('sub_store_msg'))}
+                  activeOpacity={0.88}
+                >
+                  <Text style={s.buyBtnTxt}>{formatPrice(price, pricing.currency)}/ay {t('sub_upgrade_btn')}</Text>
+                </TouchableOpacity>
+              </View>
+            )
+          })
+        ) : null}
 
         <TouchableOpacity style={s.restoreBtn} onPress={handleRestore} disabled={restoring}>
           {restoring

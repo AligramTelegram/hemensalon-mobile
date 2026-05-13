@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /mnt/c/Users/muham/Desktop/salonapy-v2/src -type d | head -40)",
+      "Read(//mnt/c/Users/muham/Desktop/salonapy-v2/**)",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('next-intl'\\); console.log\\('ok'\\)\")",
+      "Bash(mkdir -p \"C:/Users/muham/Desktop/salonapy-v2/src/i18n\")",
+      "Bash(mkdir -p \"C:/Users/muham/Desktop/salonapy-v2/src/app/[locale]/\\(vitrin\\)/ozellikler\")",
+      "Bash(mkdir -p \"C:/Users/muham/Desktop/salonapy-v2/src/app/[locale]/\\(vitrin\\)/hakkimizda\")",
+      "Bash(mkdir -p \"C:/Users/muham/Desktop/salonapy-v2/src/app/[locale]/\\(vitrin\\)/fiyatlar\")",
+      "Bash(mkdir -p \"C:/Users/muham/Desktop/salonapy-v2/src/app/[locale]/\\(vitrin\\)/iletisim\")",
+      "Bash(npm run *)",
+      "Bash(node -e \"const p = require\\('./node_modules/next-intl/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(npx tsc *)",
+      "Bash(curl -s \"http://localhost:3000/api/emails/test?type=appointment-confirmation&to=muhammedalicyln1919@gmail.com\")",
+      "Bash(Start-Sleep -Seconds 8)",
+      "Bash(curl -s \"http://localhost:3000/api/emails/test?type=appointment-confirmation-en&to=muhammedalicyln1919@gmail.com\")",
+      "Bash(curl -s \"http://localhost:3000/api/emails/test?type=appointment-confirmation-de&to=muhammedalicyln1919@gmail.com\")",
+      "Bash(curl -s \"http://localhost:3000/api/emails/test?type=appointment-confirmation-ar&to=muhammedalicyln1919@gmail.com\")",
+      "Bash(curl -s \"http://localhost:3000/api/emails/test?type=reminders&to=muhammedalicyln1919@gmail.com\")",
+      "Bash(ls \"c:\\\\Users\\\\muham\\\\Desktop\\\\hemensalon-mobile\\\\app\" /b)",
+      "Bash(dir \"c:\\\\Users\\\\muham\\\\Desktop\\\\hemensalon-mobile\\\\app\" /b)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\muham\\\\Desktop\\\\hemensalon-mobile\" -Recurse -Include \"app\", \"lib\")",
+      "Bash(Select-Object -First 20)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\muham\\\\Desktop\\\\hemensalon-mobile\" -Directory | Where-Object { $_.Name -match '^\\(app|lib\\)$' })",
+      "Bash(git commit *)",
+      "Bash(npx vercel *)",
+      "Bash(curl -s -X POST https://app.hemensalon.com/api/admin/extend-trial -H 'Content-Type: application/json' -d '{\"secret\":\"hemensalon-admin-2026\",\"email\":\"cihanbeydigital@gmail.com\",\"days\":30}')",
+      "Bash(curl -s -X POST https://app.hemensalon.com/api/admin/extend-trial -H 'Content-Type: application/json' -d '{\"secret\":\"hemensalon-admin-2026\",\"email\":\"muhammedalicyln1919@gmail.com\",\"days\":30}')",
+      "Bash(npx expo *)",
+      "Bash(node -e \"const p=require\\('./node_modules/react-native-purchases/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(npx eas *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/react-native-reanimated/package.json'\\).version\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/react-native/package.json'\\).version\\)\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(p.dependencies['react-native-reanimated']\\)\")",
+      "Bash(npm uninstall *)",
+      "Bash(ls \"C:\\\\Users\\\\muham\\\\Desktop\\\\\" | grep -i whatsapp 2>/dev/null; ls \"C:\\\\Users\\\\muham\\\\Downloads\\\\\" | grep -i whatsapp 2>/dev/null)",
+      "Read(//c/Users/muham/Desktop\" | grep -i whatsapp 2>/dev/**)",
+      "Bash(find /mnt/c/Users/muham/Desktop -name \"*.svg\" 2>/dev/null | head -10 *)",
+      "Read(//mnt/c/Users/muham/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\muham\\Desktop\\salonapy-v2\\src"
+    ]
+  }
+}

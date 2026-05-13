@@ -7,7 +7,9 @@ import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
-const SLIDE_META: { icon: any; color: string; bg: string; titleKey: string; descKey: string }[] = [
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
+
+const SLIDE_META: { icon: IoniconsName; color: string; bg: string; titleKey: string; descKey: string }[] = [
   { icon: 'calendar-outline', color: '#7C3AED', bg: '#F5F3FF', titleKey: 'onboarding_s0_title', descKey: 'onboarding_s0_desc' },
   { icon: 'people-outline',   color: '#2563EB', bg: '#EFF6FF', titleKey: 'onboarding_s1_title', descKey: 'onboarding_s1_desc' },
   { icon: 'trending-up-outline', color: '#059669', bg: '#ECFDF5', titleKey: 'onboarding_s2_title', descKey: 'onboarding_s2_desc' },
@@ -16,53 +18,41 @@ const SLIDE_META: { icon: any; color: string; bg: string; titleKey: string; desc
   { icon: 'layers-outline',   color: '#0891B2', bg: '#ECFEFF', titleKey: 'onboarding_s5_title', descKey: 'onboarding_s5_desc' },
 ]
 
-const PLAN_META = [
-  {
-    id: 'baslangic_monthly',
-    label: 'Başlangıç',
-    price: '₺189/ay',
-    color: '#2563EB',
-    bg: '#EFF6FF',
-    icon: 'rocket-outline' as const,
-    features: ['1 Personel', '100 Müşteri', '200 Randevu/ay'],
+const PLAN_IDS = ['baslangic_monthly', 'profesyonel_monthly', 'isletme_monthly'] as const
+type PlanId = typeof PLAN_IDS[number]
+
+const PLAN_CONFIG: Record<PlanId, { labelKey: string; priceKey: string; color: string; bg: string; icon: IoniconsName; features: string[]; popular?: boolean }> = {
+  baslangic_monthly: {
+    labelKey: 'onboarding_plan_baslangic', priceKey: 'onboarding_plan_baslangic_price',
+    color: '#2563EB', bg: '#EFF6FF', icon: 'rocket-outline',
+    features: ['onboarding_plan_baslangic_f1', 'onboarding_plan_baslangic_f2', 'onboarding_plan_baslangic_f3'],
   },
-  {
-    id: 'profesyonel_monthly',
-    label: 'Profesyonel',
-    price: '₺389/ay',
-    color: '#7C3AED',
-    bg: '#EDE9FE',
-    icon: 'flash-outline' as const,
-    features: ['3 Personel', '500 Müşteri', '1000 Randevu/ay'],
+  profesyonel_monthly: {
+    labelKey: 'onboarding_plan_profesyonel', priceKey: 'onboarding_plan_profesyonel_price',
+    color: '#7C3AED', bg: '#EDE9FE', icon: 'flash-outline',
+    features: ['onboarding_plan_profesyonel_f1', 'onboarding_plan_profesyonel_f2', 'onboarding_plan_profesyonel_f3'],
     popular: true,
   },
-  {
-    id: 'isletme_monthly',
-    label: 'İşletme',
-    price: '₺589/ay',
-    color: '#D97706',
-    bg: '#FEF3C7',
-    icon: 'business-outline' as const,
-    features: ['10 Personel', 'Sınırsız Müşteri', 'Sınırsız Randevu'],
+  isletme_monthly: {
+    labelKey: 'onboarding_plan_isletme', priceKey: 'onboarding_plan_isletme_price',
+    color: '#D97706', bg: '#FEF3C7', icon: 'business-outline',
+    features: ['onboarding_plan_isletme_f1', 'onboarding_plan_isletme_f2', 'onboarding_plan_isletme_f3'],
   },
-]
+}
 
 export default function Onboarding() {
   const { t } = useTranslation();
   const router = useRouter();
   const [current, setCurrent] = useState(0);
   const [showPlans, setShowPlans] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   const isLastSlide = current === SLIDE_META.length - 1;
 
-  // Sadece onboarding bitti işareti + seçilen planı kaydet, sonra kayıt ekranına git
   async function goToRegister(planId?: string) {
     await AsyncStorage.setItem('onboarding_done', '1');
-    if (planId) {
-      await AsyncStorage.setItem('selected_plan', planId);
-    }
+    if (planId) await AsyncStorage.setItem('selected_plan', planId);
     router.replace('/(auth)/login');
   }
 
@@ -84,35 +74,34 @@ export default function Onboarding() {
             <Ionicons name="arrow-back" size={20} color="#7C3AED" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={s.plansTitle}>Planınızı Seçin</Text>
-            <Text style={s.plansSub}>Kayıt olduktan sonra ödeme yapılır</Text>
+            <Text style={s.plansTitle}>{t('onboarding_choose_plan')}</Text>
+            <Text style={s.plansSub}>{t('onboarding_pay_after')}</Text>
           </View>
         </View>
 
         <ScrollView contentContainerStyle={s.plansScroll} showsVerticalScrollIndicator={false}>
-          <Text style={s.plansDesc}>
-            İstediğiniz planı seçin, kayıt sonrası 1 tıkla aktifleştirin. Ya da 3 gün ücretsiz deneyin.
-          </Text>
+          <Text style={s.plansDesc}>{t('onboarding_plan_desc')}</Text>
 
-          {PLAN_META.map(plan => {
-            const isSelected = selectedPlan === plan.id;
+          {PLAN_IDS.map(planId => {
+            const plan = PLAN_CONFIG[planId];
+            const isSelected = selectedPlan === planId;
             return (
               <TouchableOpacity
-                key={plan.id}
+                key={planId}
                 style={[s.planCard, plan.popular && { borderColor: plan.color, borderWidth: 2 }, isSelected && { borderColor: plan.color, borderWidth: 2.5, backgroundColor: plan.bg }]}
-                onPress={() => setSelectedPlan(isSelected ? null : plan.id)}
+                onPress={() => setSelectedPlan(isSelected ? null : planId)}
                 activeOpacity={0.85}
               >
                 {plan.popular && (
                   <View style={[s.popularBadge, { backgroundColor: plan.color }]}>
                     <Ionicons name="star" size={10} color="#fff" />
-                    <Text style={s.popularTxt}>En Popüler</Text>
+                    <Text style={s.popularTxt}>{t('onboarding_popular')}</Text>
                   </View>
                 )}
                 {isSelected && (
                   <View style={[s.selectedBadge, { backgroundColor: plan.color }]}>
                     <Ionicons name="checkmark" size={10} color="#fff" />
-                    <Text style={s.popularTxt}>Seçildi</Text>
+                    <Text style={s.popularTxt}>{t('onboarding_selected')}</Text>
                   </View>
                 )}
                 <View style={s.planTop}>
@@ -120,18 +109,18 @@ export default function Onboarding() {
                     <Ionicons name={plan.icon} size={22} color={plan.color} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.planName}>{plan.label}</Text>
-                    <Text style={[s.planPrice, { color: plan.color }]}>{plan.price}</Text>
+                    <Text style={s.planName}>{t(plan.labelKey)}</Text>
+                    <Text style={[s.planPrice, { color: plan.color }]}>{t(plan.priceKey)}</Text>
                   </View>
                   <View style={[s.radioCircle, isSelected && { backgroundColor: plan.color, borderColor: plan.color }]}>
                     {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
                   </View>
                 </View>
                 <View style={s.featList}>
-                  {plan.features.map(f => (
-                    <View key={f} style={s.featRow}>
+                  {plan.features.map(fKey => (
+                    <View key={fKey} style={s.featRow}>
                       <Ionicons name="checkmark-circle" size={14} color={plan.color} />
-                      <Text style={s.featTxt}>{f}</Text>
+                      <Text style={s.featTxt}>{t(fKey)}</Text>
                     </View>
                   ))}
                 </View>
@@ -140,25 +129,21 @@ export default function Onboarding() {
           })}
 
           <TouchableOpacity
-            style={[s.ctaBtn, selectedPlan ? { backgroundColor: PLAN_META.find(p => p.id === selectedPlan)?.color ?? '#7C3AED' } : { backgroundColor: '#7C3AED' }]}
+            style={[s.ctaBtn, { backgroundColor: selectedPlan ? PLAN_CONFIG[selectedPlan].color : '#7C3AED' }]}
             onPress={() => goToRegister(selectedPlan ?? undefined)}
             activeOpacity={0.88}
           >
             <Text style={s.ctaBtnTxt}>
-              {selectedPlan
-                ? `${PLAN_META.find(p => p.id === selectedPlan)?.label} ile Başla →`
-                : 'Kayıt Ol ve Başla →'}
+              {selectedPlan ? t('onboarding_cta_selected', { label: t(PLAN_CONFIG[selectedPlan].labelKey) }) : t('onboarding_cta_default')}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={s.trialBtn} onPress={() => goToRegister()}>
             <Ionicons name="time-outline" size={16} color="#6B7280" />
-            <Text style={s.trialBtnTxt}>3 Gün Ücretsiz Dene</Text>
+            <Text style={s.trialBtnTxt}>{t('onboarding_trial_cta')}</Text>
           </TouchableOpacity>
 
-          <Text style={s.legalTxt}>
-            Ödeme kayıt sonrası App Store / Google Play üzerinden yapılır. Dilediğiniz zaman iptal edebilirsiniz.
-          </Text>
+          <Text style={s.legalTxt}>{t('onboarding_legal')}</Text>
         </ScrollView>
       </View>
     );
@@ -198,13 +183,13 @@ export default function Onboarding() {
         </View>
 
         <TouchableOpacity style={s.nextBtn} onPress={next} activeOpacity={0.85}>
-          <Text style={s.nextTxt}>{isLastSlide ? 'Planları Gör' : t('onboarding_next')}</Text>
+          <Text style={s.nextTxt}>{isLastSlide ? t('onboarding_see_plans') : t('onboarding_next')}</Text>
           <Ionicons name={isLastSlide ? 'rocket-outline' : 'arrow-forward'} size={18} color="#7C3AED" />
         </TouchableOpacity>
 
         {isLastSlide && (
           <TouchableOpacity style={s.trialBtnInline} onPress={() => goToRegister()}>
-            <Text style={s.trialBtnInlineTxt}>3 gün ücretsiz dene →</Text>
+            <Text style={s.trialBtnInlineTxt}>{t('onboarding_trial_inline')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -234,7 +219,6 @@ const s = StyleSheet.create({
   trialBtnInline: { alignItems: 'center', paddingTop: 16 },
   trialBtnInlineTxt: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontWeight: '600' },
 
-  // Plan seçim ekranı
   plansRoot: { flex: 1, backgroundColor: '#F4F4F8' },
   plansHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: Platform.OS === 'ios' ? 60 : 32, paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#EDE9FE', justifyContent: 'center', alignItems: 'center' },
