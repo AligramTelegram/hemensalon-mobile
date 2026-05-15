@@ -252,7 +252,8 @@ export default function DenemeBitti() {
             { key: 'PROFESYONEL', labelKey: 'plan_PROFESYONEL_label', color: '#7C3AED', bg: '#EDE9FE', icon: 'flash-outline' as const, popular: true, featureKeys: ['plan_PROFESYONEL_f1','plan_PROFESYONEL_f2','plan_PROFESYONEL_f3'] },
             { key: 'ISLETME', labelKey: 'plan_ISLETME_label', color: '#D97706', bg: '#FEF3C7', icon: 'business-outline' as const, featureKeys: ['plan_ISLETME_f1','plan_ISLETME_f2','plan_ISLETME_f3'] },
           ].map(plan => {
-            const price = pricing[plan.key as keyof typeof pricing]
+            const priceKey: Record<string, 'starter' | 'professional' | 'business'> = { BASLANGIC: 'starter', PROFESYONEL: 'professional', ISLETME: 'business' }
+            const price = pricing[priceKey[plan.key]]
             const isPreferred = preferredPlanId === plan.key.toLowerCase() + '_monthly'
             return (
               <View key={plan.key} style={[s.planCard, (plan.popular || isPreferred) && { borderColor: plan.color, borderWidth: 2 }]}>
@@ -274,7 +275,7 @@ export default function DenemeBitti() {
                   <View style={{ flex: 1 }}>
                     <Text style={s.planName}>{t(plan.labelKey)}</Text>
                     <Text style={[s.planPrice, { color: plan.color }]}>
-                      {formatPrice(price, pricing.currency)}<Text style={s.planPer}>/ay</Text>
+                      {formatPrice(price as number, pricing.symbol)}<Text style={s.planPer}>/ay</Text>
                     </Text>
                   </View>
                 </View>
@@ -291,7 +292,7 @@ export default function DenemeBitti() {
                   onPress={() => Alert.alert(t('sub_store_title'), t('sub_store_msg'))}
                   activeOpacity={0.88}
                 >
-                  <Text style={s.buyBtnTxt}>{formatPrice(price, pricing.currency)}/ay {t('sub_upgrade_btn')}</Text>
+                  <Text style={s.buyBtnTxt}>{formatPrice(price as number, pricing.symbol)}/ay {t('sub_upgrade_btn')}</Text>
                 </TouchableOpacity>
               </View>
             )
