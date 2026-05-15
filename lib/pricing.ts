@@ -12,10 +12,10 @@ interface PricingData {
 
 const PRICING: Record<string, PricingData> = {
   TR: { country: 'TR', currency: 'TRY', symbol: '₺', starter: 540, professional: 1140, business: 1740 },
-  US: { country: 'US', currency: 'USD', symbol: '$', starter: 29, professional: 59, business: 89 },
-  DE: { country: 'DE', currency: 'EUR', symbol: '€', starter: 27, professional: 55, business: 82 },
-  AE: { country: 'AE', currency: 'AED', symbol: 'د.إ', starter: 109, professional: 219, business: 329 },
-  GB: { country: 'GB', currency: 'GBP', symbol: '£', starter: 23, professional: 47, business: 69 },
+  US: { country: 'US', currency: 'USD', symbol: '$', starter: 19, professional: 39, business: 59 },
+  DE: { country: 'DE', currency: 'EUR', symbol: '€', starter: 17, professional: 35, business: 54 },
+  AE: { country: 'AE', currency: 'AED', symbol: 'د.إ', starter: 70, professional: 145, business: 219 },
+  GB: { country: 'GB', currency: 'GBP', symbol: '£', starter: 15, professional: 31, business: 47 },
 };
 
 const CURRENCY_TO_COUNTRY: Record<string, string> = {
@@ -52,16 +52,17 @@ export async function detectCountry(): Promise<string> {
   // 3. IP tespiti (fallback)
   try {
     const res = await axios.get('https://ipapi.co/json/', { timeout: 4000 });
-    _cachedCountry = res.data.country_code || 'TR'
+    const code = res.data.country_code || 'US'
+    _cachedCountry = PRICING[code] ? code : 'US'
     return _cachedCountry
   } catch {
-    _cachedCountry = 'TR'
+    _cachedCountry = 'US'
     return _cachedCountry
   }
 }
 
 export function getPricing(country: string): PricingData {
-  return PRICING[country] || PRICING.TR;
+  return PRICING[country] || PRICING.US;
 }
 
 export function formatPrice(price: number, symbol: string): string {
