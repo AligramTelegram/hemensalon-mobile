@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 
-type Mode = 'landing' | 'login' | 'register' | 'forgot' | 'staff'
+type Mode = 'landing' | 'login' | 'register' | 'forgot' | 'staff' | 'verify_email'
 type LegalDoc = 'gizlilik' | 'kullanim' | 'kvkk' | null
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -53,6 +53,7 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   // Personel girişi
   const [staffEmail, setStaffEmail] = useState('')
@@ -84,13 +85,21 @@ export default function Login() {
     if (mode === 'login') {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) { setLoading(false); Alert.alert(t('auth_loginError'), error.message); return }
+
+      // E-posta doğrulaması kontrolü
+      if (!data.user?.email_confirmed_at) {
+        await supabase.auth.signOut()
+        setLoading(false)
+        setMode('verify_email')
+        return
+      }
+
       const accessToken = data.session?.access_token
       if (accessToken) {
         await secureStorage.setItem('mobile_token', accessToken)
       }
-      const { data: { user } } = await supabase.auth.getUser()
       setLoading(false)
-      if (user) router.replace('/(tabs)')
+      router.replace('/(tabs)')
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) { setLoading(false); Alert.alert(t('auth_registerError'), error.message); return }
@@ -124,9 +133,26 @@ export default function Login() {
         }
       }
       setLoading(false)
-      Alert.alert(t('success'), t('auth_register_success'), [
-        { text: t('auth_login'), onPress: () => { setMode('login'); setPassword(''); setBusinessName(''); setBusinessPhone(''); setBusinessCity(''); setBusinessAddress(''); setOwnerName('') } },
-      ])
+      setMode('verify_email')
+    }
+  }
+
+  async function handleResendVerification() {
+    if (resendCooldown > 0) return
+    setLoading(true)
+    const { error } = await supabase.auth.resend({ type: 'signup', email })
+    setLoading(false)
+    if (error) {
+      Alert.alert(t('error'), error.message)
+    } else {
+      Alert.alert(t('success'), t('auth_verify_resend_success'))
+      setResendCooldown(60)
+      const interval = setInterval(() => {
+        setResendCooldown(v => {
+          if (v <= 1) { clearInterval(interval); return 0 }
+          return v - 1
+        })
+      }, 1000)
     }
   }
 
@@ -187,6 +213,58 @@ export default function Login() {
       </View>
     </Modal>
   )
+
+  // ── EMAIL VERIFY ────────────────────────────────────────
+  if (mode === 'verify_email') {
+    return (
+      <View style={s.root}>
+        <View style={s.deco1} />
+        <View style={s.deco2} />
+        <View style={s.deco3} />
+        <View style={[s.formScroll, { flex: 1, justifyContent: 'center', paddingTop: headerPad }]}>
+          <View style={s.card}>
+            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+              <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#EDE9FE', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+                <Ionicons name="mail-outline" size={36} color="#7C3AED" />
+              </View>
+              <Text style={[s.cardTitle, { textAlign: 'center' }]}>{t('auth_verify_title')}</Text>
+              <Text style={[s.cardSub, { textAlign: 'center', marginTop: 8 }]}>
+                {t('auth_verify_sub', { email })}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFBEB', borderRadius: 10, padding: 10, marginTop: 12, borderWidth: 1, borderColor: '#FDE68A' }}>
+                <Ionicons name="warning-outline" size={14} color="#D97706" />
+                <Text style={{ fontSize: 12, color: '#92400E', flex: 1 }}>{t('auth_verify_check_spam')}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[s.btn, resendCooldown > 0 && { backgroundColor: '#9CA3AF' }]}
+              onPress={handleResendVerification}
+              disabled={loading || resendCooldown > 0}
+              activeOpacity={0.85}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={s.btnTxt}>
+                    {resendCooldown > 0
+                      ? t('auth_verify_resend_wait', { sec: resendCooldown })
+                      : t('auth_verify_resend_btn')}
+                  </Text>
+              }
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[s.switchRow, { marginTop: 16 }]}
+              onPress={() => { setMode('login'); setPassword('') }}
+            >
+              <Ionicons name="chevron-back" size={14} color="#7C3AED" />
+              <Text style={s.switchLink}>{t('auth_verify_back')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    )
+  }
 
   // ── LANDING ─────────────────────────────────────────────
   if (mode === 'landing') {
