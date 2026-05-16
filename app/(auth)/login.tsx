@@ -10,7 +10,6 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import * as WebBrowser from 'expo-web-browser'
 import * as AppleAuthentication from 'expo-apple-authentication'
-import { makeRedirectUri } from 'expo-auth-session'
 import { supabase } from '@/lib/supabase'
 import { secureStorage } from '@/lib/secureStorage'
 import { useTranslation } from 'react-i18next'
@@ -183,7 +182,7 @@ export default function Login() {
   async function handleGoogleSignIn() {
     setLoading(true)
     try {
-      const redirectUri = makeRedirectUri({ scheme: 'hemensalon', path: 'auth/callback' })
+      const redirectUri = 'hemensalon://auth/callback'
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: redirectUri, skipBrowserRedirect: true },
@@ -192,8 +191,15 @@ export default function Login() {
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri)
       if (result.type !== 'success') { setLoading(false); return }
 
-      // PKCE code flow
-      const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url)
+      // Token'ları URL'den parse et (implicit flow)
+      const url = result.url
+      const fragment = url.includes('#') ? url.split('#')[1] : url.split('?')[1] ?? ''
+      const params = new URLSearchParams(fragment)
+      const accessToken = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
+      if (!accessToken || !refreshToken) throw new Error('Token alınamadı')
+
+      const { error: sessionError } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
       if (sessionError) throw sessionError
 
       const { data: { user } } = await supabase.auth.getUser()
