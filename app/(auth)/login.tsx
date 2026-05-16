@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView,
@@ -8,13 +8,18 @@ import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import * as WebBrowser from 'expo-web-browser'
+import * as AppleAuthentication from 'expo-apple-authentication'
+import { makeRedirectUri } from 'expo-auth-session'
 import { supabase } from '@/lib/supabase'
 import { secureStorage } from '@/lib/secureStorage'
 import { useTranslation } from 'react-i18next'
 
+WebBrowser.maybeCompleteAuthSession()
+
 const { width: SCREEN_W } = Dimensions.get('window')
 
-type Mode = 'landing' | 'login' | 'register' | 'forgot' | 'staff' | 'verify_email'
+type Mode = 'landing' | 'login' | 'register' | 'forgot' | 'staff' | 'verify_email' | 'setup'
 type LegalDoc = 'gizlilik' | 'kullanim' | 'kvkk' | null
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -54,6 +59,20 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
+  const [appleAvailable, setAppleAvailable] = useState(false)
+
+  // OAuth setup (yeni kullanıcı - işletme adı gerekli)
+  const [setupSupabaseId, setSetupSupabaseId] = useState('')
+  const [setupEmail, setSetupEmail] = useState('')
+  const [setupName, setSetupName] = useState('')
+  const [setupBusinessName, setSetupBusinessName] = useState('')
+  const [setupPhone, setSetupPhone] = useState('')
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable)
+    }
+  }, [])
 
   // Personel girişi
   const [staffEmail, setStaffEmail] = useState('')
@@ -134,6 +153,111 @@ export default function Login() {
       }
       setLoading(false)
       setMode('verify_email')
+    }
+  }
+
+  async function handleOAuthSuccess(userId: string, userEmail: string, displayName: string) {
+    try {
+      const session = (await supabase.auth.getSession()).data.session
+      const token = session?.access_token ?? ''
+      const res = await fetch(`${BASE}/api/tenant`, {
+        headers: { 'x-mobile-token': token },
+      })
+      if (res.ok) {
+        await secureStorage.setItem('mobile_token', token)
+        setLoading(false)
+        router.replace('/(tabs)')
+        return
+      }
+    } catch {}
+    // Yeni kullanıcı → işletme bilgileri gerekli
+    setSetupSupabaseId(userId)
+    setSetupEmail(userEmail)
+    setSetupName(displayName || userEmail.split('@')[0])
+    setSetupBusinessName('')
+    setSetupPhone('')
+    setLoading(false)
+    setMode('setup')
+  }
+
+  async function handleGoogleSignIn() {
+    setLoading(true)
+    try {
+      const redirectUri = makeRedirectUri({ scheme: 'hemensalon', path: 'auth/callback' })
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: redirectUri, skipBrowserRedirect: true },
+      })
+      if (error || !data.url) throw error ?? new Error('OAuth URL alınamadı')
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri)
+      if (result.type !== 'success') { setLoading(false); return }
+
+      // PKCE code flow
+      const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url)
+      if (sessionError) throw sessionError
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Kullanıcı bilgisi alınamadı')
+      await handleOAuthSuccess(user.id, user.email ?? '', user.user_metadata?.full_name ?? '')
+    } catch (e: unknown) {
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_general'))
+      setLoading(false)
+    }
+  }
+
+  async function handleAppleSignIn() {
+    setLoading(true)
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      })
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken!,
+      })
+      if (error) throw error
+      const user = data.user
+      if (!user) throw new Error('Kullanıcı bilgisi alınamadı')
+      const name = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ')
+      await handleOAuthSuccess(user.id, user.email ?? '', name)
+    } catch (e: unknown) {
+      if ((e as any)?.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert(t('error'), e instanceof Error ? e.message : t('err_general'))
+      }
+      setLoading(false)
+    }
+  }
+
+  async function handleSetupSubmit() {
+    if (!setupBusinessName.trim()) { Alert.alert(t('warning'), t('auth_fillAll')); return }
+    setLoading(true)
+    try {
+      const res = await fetch(`${BASE}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supabaseId: setupSupabaseId,
+          email: setupEmail,
+          name: setupName,
+          businessName: setupBusinessName.trim(),
+          phone: setupPhone.trim() || undefined,
+          plan: 'BASLANGIC',
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d?.error ?? t('auth_register_failed'))
+      }
+      const token = (await supabase.auth.getSession()).data.session?.access_token ?? ''
+      await secureStorage.setItem('mobile_token', token)
+      setLoading(false)
+      router.replace('/(tabs)')
+    } catch (e: unknown) {
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_general'))
+      setLoading(false)
     }
   }
 
@@ -263,6 +387,31 @@ export default function Login() {
           </View>
         </View>
       </View>
+    )
+  }
+
+  // ── SETUP (OAuth yeni kullanıcı) ─────────────────────────
+  if (mode === 'setup') {
+    return (
+      <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={s.deco1} /><View style={s.deco2} /><View style={s.deco3} />
+        <ScrollView contentContainerStyle={[s.formScroll, { paddingTop: headerPad }]} keyboardShouldPersistTaps="handled">
+          <View style={s.formLogoWrap}>
+            <Image source={require('@/assets/icon.png')} style={s.logoIcon} />
+            <Text style={s.logoText}>HemenSalon</Text>
+          </View>
+          <View style={s.card}>
+            <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#EDE9FE', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+              <Ionicons name="storefront-outline" size={26} color="#7C3AED" />
+            </View>
+            <Text style={s.cardTitle}>{t('auth_setup_title')}</Text>
+            <Text style={s.cardSub}>{t('auth_setup_sub')}</Text>
+            <InputField icon="storefront-outline" placeholder={`${t('settings_businessName')} *`} value={setupBusinessName} onChange={setSetupBusinessName} />
+            <InputField icon="call-outline" placeholder={t('phone')} value={setupPhone} onChange={setSetupPhone} keyboardType="phone-pad" />
+            <SubmitBtn loading={loading} label={t('continue')} onPress={handleSetupSubmit} />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     )
   }
 
@@ -523,6 +672,25 @@ export default function Login() {
 
               <SubmitBtn loading={loading} label={mode === 'login' ? t('auth_login') : t('auth_register')} onPress={handleSubmit} />
 
+              {/* OAuth */}
+              <View style={s.dividerRow}>
+                <View style={s.dividerLine} />
+                <Text style={s.dividerTxt}>{t('auth_or')}</Text>
+                <View style={s.dividerLine} />
+              </View>
+
+              <TouchableOpacity style={s.oauthBtn} onPress={handleGoogleSignIn} disabled={loading} activeOpacity={0.85}>
+                <Ionicons name="logo-google" size={19} color="#EA4335" />
+                <Text style={s.oauthBtnTxt}>{t('auth_google_btn')}</Text>
+              </TouchableOpacity>
+
+              {Platform.OS === 'ios' && appleAvailable && (
+                <TouchableOpacity style={[s.oauthBtn, { backgroundColor: '#000', borderColor: '#000' }]} onPress={handleAppleSignIn} disabled={loading} activeOpacity={0.85}>
+                  <Ionicons name="logo-apple" size={19} color="#fff" />
+                  <Text style={[s.oauthBtnTxt, { color: '#fff' }]}>{t('auth_apple_btn')}</Text>
+                </TouchableOpacity>
+              )}
+
               {mode === 'login' && (
                 <View style={s.switchRow}>
                   <Text style={s.switchTxt}>{t('auth_noAccount')} </Text>
@@ -679,6 +847,12 @@ const s = StyleSheet.create({
 
   btn: { backgroundColor: '#7C3AED', padding: 17, borderRadius: 14, alignItems: 'center', marginTop: 4, shadowColor: '#7C3AED', shadowOpacity: 0.4, shadowRadius: 12, elevation: 6 },
   btnTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
+
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
+  dividerTxt: { fontSize: 12, color: '#9CA3AF', fontWeight: '600' },
+  oauthBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 14, padding: 14, marginBottom: 10, backgroundColor: '#fff' },
+  oauthBtnTxt: { fontSize: 14, fontWeight: '700', color: '#374151' },
 
   switchRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 18 },
   switchTxt: { fontSize: 13, color: '#6B7280' },

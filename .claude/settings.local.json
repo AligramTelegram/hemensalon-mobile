@@ -41,7 +41,23 @@
       "Bash(ls \"C:\\\\Users\\\\muham\\\\Desktop\\\\\" | grep -i whatsapp 2>/dev/null; ls \"C:\\\\Users\\\\muham\\\\Downloads\\\\\" | grep -i whatsapp 2>/dev/null)",
       "Read(//c/Users/muham/Desktop\" | grep -i whatsapp 2>/dev/**)",
       "Bash(find /mnt/c/Users/muham/Desktop -name \"*.svg\" 2>/dev/null | head -10 *)",
-      "Read(//mnt/c/Users/muham/**)"
+      "Read(//mnt/c/Users/muham/**)",
+      "Bash(git restore *)",
+      "Bash(set CI=1)",
+      "PowerShell(Copy-Item \"C:\\\\Users\\\\muham\\\\Downloads\\\\Ads�z tasar�m \\(1\\).png\" \"C:\\\\Users\\\\muham\\\\Desktop\\\\salonapy-v2\\\\public\\\\images\\\\logo.png\" -Force)",
+      "PowerShell(Copy-Item \"C:\\\\Users\\\\muham\\\\Downloads\\\\Ads�z tasar�m \\(1\\).png\" \"C:\\\\Users\\\\muham\\\\Desktop\\\\hemensalon-mobile\\\\assets\\\\icon.png\" -Force)",
+      "PowerShell(Copy-Item \"C:\\\\Users\\\\muham\\\\Downloads\\\\Ads�z tasar�m \\(1\\).png\" \"C:\\\\Users\\\\muham\\\\Desktop\\\\hemensalon-mobile\\\\assets\\\\adaptive-icon.png\" -Force)",
+      "PowerShell(Copy-Item \"C:\\\\Users\\\\muham\\\\Downloads\\\\Ads�z tasar�m \\(1\\).png\" \"C:\\\\Users\\\\muham\\\\Desktop\\\\hemensalon-mobile\\\\assets\\\\splash-icon.png\" -Force)",
+      "Bash(node -e \"require\\('sharp'\\); console.log\\('ok'\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(curl -s -X GET \"https://www.hemensalon.com/api/cron/send-reminders\" -H \"Authorization: Bearer hs-cron-2026-secret\")",
+      "Bash(curl -s -X GET \"https://www.hemensalon.com/api/cron/send-reminders-1h\" -H \"Authorization: Bearer hs-cron-2026-secret\")",
+      "Bash(curl -s -X GET \"https://www.hemensalon.com/api/cron/send-reminders-email\" -H \"Authorization: Bearer hs-cron-2026-secret\")",
+      "Bash(curl -s -X GET \"https://www.hemensalon.com/api/cron/send-reminders-1h-email\" -H \"Authorization: Bearer hs-cron-2026-secret\")",
+      "Bash(curl -s \"https://www.hemensalon.com/api/cron/send-reminders\" -H \"Authorization: Bearer hs-cron-2026-secret\")",
+      "Bash(curl -s \"https://www.hemensalon.com/api/cron/send-reminders-1h\" -H \"Authorization: Bearer hs-cron-2026-secret\")",
+      "WebSearch",
+      "Bash(node scripts/create-test-user.mjs)"
     ],
     "additionalDirectories": [
       "C:\\Users\\muham\\Desktop\\salonapy-v2\\src"
