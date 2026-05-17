@@ -27,8 +27,16 @@ const LANG_TO_COUNTRY: Record<string, string> = {
 };
 
 let _cachedCountry: string | null = null
+let _pending: Promise<string> | null = null
 
 export async function detectCountry(): Promise<string> {
+  if (_cachedCountry) return _cachedCountry
+  if (_pending) return _pending
+  _pending = _detect().finally(() => { _pending = null })
+  return _pending
+}
+
+async function _detect(): Promise<string> {
   if (_cachedCountry) return _cachedCountry
 
   // 1. Kullanıcının kaydettiği para birimi tercihi

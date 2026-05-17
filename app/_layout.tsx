@@ -34,19 +34,22 @@ export default function RootLayout() {
       await initI18n(country);
       I18nManager.forceRTL(isRTL());
 
-      // 24 saatlik oturum süresi kontrolü
-      const SESSION_TTL = 24 * 60 * 60 * 1000
+      // Oturum süresi kontrolü — JWT expiry'sine göre, yoksa 24h fallback
+      const expiresAtStr = await secureStorage.getItem('session_expires_at')
       const loginTimeStr = await secureStorage.getItem('login_time')
-      if (loginTimeStr) {
-        const elapsed = Date.now() - parseInt(loginTimeStr, 10)
-        if (elapsed > SESSION_TTL) {
-          await supabase.auth.signOut()
-          await secureStorage.removeItem('mobile_token')
-          await secureStorage.removeItem('refresh_token')
-          await secureStorage.removeItem('staff_token')
-          await secureStorage.removeItem('staff_data')
-          await secureStorage.removeItem('login_time')
-        }
+      const isExpired = expiresAtStr
+        ? Date.now() > parseInt(expiresAtStr, 10)
+        : loginTimeStr
+          ? Date.now() - parseInt(loginTimeStr, 10) > 24 * 60 * 60 * 1000
+          : false
+      if (isExpired) {
+        await supabase.auth.signOut()
+        await secureStorage.removeItem('mobile_token')
+        await secureStorage.removeItem('refresh_token')
+        await secureStorage.removeItem('staff_token')
+        await secureStorage.removeItem('staff_data')
+        await secureStorage.removeItem('login_time')
+        await secureStorage.removeItem('session_expires_at')
       }
 
       // Supabase session kontrolü

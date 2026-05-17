@@ -8,17 +8,13 @@ import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
-import * as WebBrowser from 'expo-web-browser'
-import * as AppleAuthentication from 'expo-apple-authentication'
 import { supabase } from '@/lib/supabase'
 import { secureStorage } from '@/lib/secureStorage'
 import { useTranslation } from 'react-i18next'
 
-WebBrowser.maybeCompleteAuthSession()
-
 const { width: SCREEN_W } = Dimensions.get('window')
 
-type Mode = 'landing' | 'login' | 'register' | 'forgot' | 'staff' | 'verify_email' | 'setup'
+type Mode = 'landing' | 'login' | 'register' | 'forgot' | 'staff' | 'verify_email'
 type LegalDoc = 'gizlilik' | 'kullanim' | 'kvkk' | null
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -29,6 +25,20 @@ const LEGAL_KEYS: Record<NonNullable<LegalDoc>, { titleKey: string; contentKey: 
 }
 
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://app.hemensalon.com'
+
+const SECTORS: { key: string; icon: IoniconsName }[] = [
+  { key: 'HAIR',      icon: 'cut-outline' },
+  { key: 'BARBER',    icon: 'man-outline' },
+  { key: 'NAIL',      icon: 'color-palette-outline' },
+  { key: 'SPA',       icon: 'leaf-outline' },
+  { key: 'AESTHETIC', icon: 'sparkles-outline' },
+  { key: 'MAKEUP',    icon: 'brush-outline' },
+  { key: 'TATTOO',    icon: 'pencil-outline' },
+  { key: 'PHYSIO',    icon: 'fitness-outline' },
+  { key: 'DENTAL',    icon: 'medkit-outline' },
+  { key: 'VET',       icon: 'paw-outline' },
+  { key: 'OTHER',     icon: 'ellipsis-horizontal-outline' },
+]
 
 const FEATURES: { icon: IoniconsName; color: string; bg: string; titleKey: string; descKey: string }[] = [
   { icon: 'calendar-outline',      color: '#7C3AED', bg: '#F5F3FF', titleKey: 'login_feature_appointments_title', descKey: 'login_feature_appointments_desc' },
@@ -53,25 +63,13 @@ export default function Login() {
   const [businessPhone, setBusinessPhone] = useState('')
   const [businessCity, setBusinessCity] = useState('')
   const [businessAddress, setBusinessAddress] = useState('')
+  const [businessSector, setBusinessSector] = useState('HAIR')
+  const [showSectorPicker, setShowSectorPicker] = useState(false)
   const [ownerName, setOwnerName] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
-  const [appleAvailable, setAppleAvailable] = useState(false)
-
-  // OAuth setup (yeni kullanıcı - işletme adı gerekli)
-  const [setupSupabaseId, setSetupSupabaseId] = useState('')
-  const [setupEmail, setSetupEmail] = useState('')
-  const [setupName, setSetupName] = useState('')
-  const [setupBusinessName, setSetupBusinessName] = useState('')
-  const [setupPhone, setSetupPhone] = useState('')
-
-  useEffect(() => {
-    if (Platform.OS === 'ios') {
-      AppleAuthentication.isAvailableAsync().then(setAppleAvailable)
-    }
-  }, [])
 
   // Personel girişi
   const [staffEmail, setStaffEmail] = useState('')
@@ -115,6 +113,12 @@ export default function Login() {
       const accessToken = data.session?.access_token
       if (accessToken) {
         await secureStorage.setItem('mobile_token', accessToken)
+        await secureStorage.setItem('login_time', Date.now().toString())
+        // JWT expiry'sini sakla (expires_at saniye cinsinden)
+        const expiresAt = data.session?.expires_at
+        if (expiresAt) {
+          await secureStorage.setItem('session_expires_at', (expiresAt * 1000).toString())
+        }
       }
       setLoading(false)
       router.replace('/(tabs)')
@@ -135,6 +139,7 @@ export default function Login() {
               address: businessAddress.trim()
                 ? `${businessAddress.trim()}${businessCity.trim() ? ', ' + businessCity.trim() : ''}`
                 : businessCity.trim() || undefined,
+              sector: businessSector,
               plan: 'BASLANGIC',
               trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
             }),
@@ -152,118 +157,6 @@ export default function Login() {
       }
       setLoading(false)
       setMode('verify_email')
-    }
-  }
-
-  async function handleOAuthSuccess(userId: string, userEmail: string, displayName: string) {
-    try {
-      const session = (await supabase.auth.getSession()).data.session
-      const token = session?.access_token ?? ''
-      const res = await fetch(`${BASE}/api/tenant`, {
-        headers: { 'x-mobile-token': token },
-      })
-      if (res.ok) {
-        await secureStorage.setItem('mobile_token', token)
-        setLoading(false)
-        router.replace('/(tabs)')
-        return
-      }
-    } catch {}
-    // Yeni kullanıcı → işletme bilgileri gerekli
-    setSetupSupabaseId(userId)
-    setSetupEmail(userEmail)
-    setSetupName(displayName || userEmail.split('@')[0])
-    setSetupBusinessName('')
-    setSetupPhone('')
-    setLoading(false)
-    setMode('setup')
-  }
-
-  async function handleGoogleSignIn() {
-    setLoading(true)
-    try {
-      const redirectUri = 'hemensalon://auth/callback'
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: redirectUri, skipBrowserRedirect: true },
-      })
-      if (error || !data.url) throw error ?? new Error('OAuth URL alınamadı')
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri)
-      if (result.type !== 'success') { setLoading(false); return }
-
-      // Token'ları URL'den parse et (implicit flow)
-      const url = result.url
-      const fragment = url.includes('#') ? url.split('#')[1] : url.split('?')[1] ?? ''
-      const params = new URLSearchParams(fragment)
-      const accessToken = params.get('access_token')
-      const refreshToken = params.get('refresh_token')
-      if (!accessToken || !refreshToken) throw new Error('Token alınamadı')
-
-      const { error: sessionError } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-      if (sessionError) throw sessionError
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Kullanıcı bilgisi alınamadı')
-      await handleOAuthSuccess(user.id, user.email ?? '', user.user_metadata?.full_name ?? '')
-    } catch (e: unknown) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_general'))
-      setLoading(false)
-    }
-  }
-
-  async function handleAppleSignIn() {
-    setLoading(true)
-    try {
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      })
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: credential.identityToken!,
-      })
-      if (error) throw error
-      const user = data.user
-      if (!user) throw new Error('Kullanıcı bilgisi alınamadı')
-      const name = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ')
-      await handleOAuthSuccess(user.id, user.email ?? '', name)
-    } catch (e: unknown) {
-      if ((e as any)?.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert(t('error'), e instanceof Error ? e.message : t('err_general'))
-      }
-      setLoading(false)
-    }
-  }
-
-  async function handleSetupSubmit() {
-    if (!setupBusinessName.trim()) { Alert.alert(t('warning'), t('auth_fillAll')); return }
-    setLoading(true)
-    try {
-      const res = await fetch(`${BASE}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supabaseId: setupSupabaseId,
-          email: setupEmail,
-          name: setupName,
-          businessName: setupBusinessName.trim(),
-          phone: setupPhone.trim() || undefined,
-          plan: 'BASLANGIC',
-        }),
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        throw new Error(d?.error ?? t('auth_register_failed'))
-      }
-      const token = (await supabase.auth.getSession()).data.session?.access_token ?? ''
-      await secureStorage.setItem('mobile_token', token)
-      setLoading(false)
-      router.replace('/(tabs)')
-    } catch (e: unknown) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_general'))
-      setLoading(false)
     }
   }
 
@@ -311,6 +204,7 @@ export default function Login() {
       }
       // staff_token = marker: layout staff tespiti için kullanılıyor
       await secureStorage.setItem('staff_token', 'staff')
+      await secureStorage.setItem('login_time', Date.now().toString())
       await secureStorage.setItem('staff_data', JSON.stringify({
         name: data.name,
         role: 'staff',
@@ -393,31 +287,6 @@ export default function Login() {
           </View>
         </View>
       </View>
-    )
-  }
-
-  // ── SETUP (OAuth yeni kullanıcı) ─────────────────────────
-  if (mode === 'setup') {
-    return (
-      <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={s.deco1} /><View style={s.deco2} /><View style={s.deco3} />
-        <ScrollView contentContainerStyle={[s.formScroll, { paddingTop: headerPad }]} keyboardShouldPersistTaps="handled">
-          <View style={s.formLogoWrap}>
-            <Image source={require('@/assets/icon.png')} style={s.logoIcon} />
-            <Text style={s.logoText}>HemenSalon</Text>
-          </View>
-          <View style={s.card}>
-            <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#EDE9FE', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-              <Ionicons name="storefront-outline" size={26} color="#7C3AED" />
-            </View>
-            <Text style={s.cardTitle}>{t('auth_setup_title')}</Text>
-            <Text style={s.cardSub}>{t('auth_setup_sub')}</Text>
-            <InputField icon="storefront-outline" placeholder={`${t('settings_businessName')} *`} value={setupBusinessName} onChange={setSetupBusinessName} />
-            <InputField icon="call-outline" placeholder={t('phone')} value={setupPhone} onChange={setSetupPhone} keyboardType="phone-pad" />
-            <SubmitBtn loading={loading} label={t('continue')} onPress={handleSetupSubmit} />
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
     )
   }
 
@@ -620,6 +489,32 @@ export default function Login() {
               {mode === 'register' && (
                 <>
                   <Text style={s.sectionLabel}>{t('settings_business')}</Text>
+
+                  {/* Sektör seçici */}
+                  <Text style={s.fieldLabel}>{t('settings_sector')}</Text>
+                  <TouchableOpacity style={s.sectorBtn} onPress={() => setShowSectorPicker(v => !v)}>
+                    <Ionicons name={SECTORS.find(sec => sec.key === businessSector)?.icon ?? 'cut-outline'} size={18} color="#7C3AED" />
+                    <Text style={s.sectorBtnTxt}>{t(`sector_${businessSector}`)}</Text>
+                    <Ionicons name={showSectorPicker ? 'chevron-up' : 'chevron-down'} size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                  {showSectorPicker && (
+                    <View style={s.sectorDropdown}>
+                      {SECTORS.map(sec => (
+                        <TouchableOpacity
+                          key={sec.key}
+                          style={[s.sectorOption, businessSector === sec.key && s.sectorOptionActive]}
+                          onPress={() => { Haptics.selectionAsync(); setBusinessSector(sec.key); setShowSectorPicker(false) }}
+                        >
+                          <Ionicons name={sec.icon} size={16} color={businessSector === sec.key ? '#7C3AED' : '#6B7280'} />
+                          <Text style={[s.sectorOptionTxt, businessSector === sec.key && s.sectorOptionTxtActive]}>
+                            {t(`sector_${sec.key}`)}
+                          </Text>
+                          {businessSector === sec.key && <Ionicons name="checkmark" size={15} color="#7C3AED" style={{ marginLeft: 'auto' }} />}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
                   <InputField icon="storefront-outline" placeholder={`${t('settings_businessName')} *`} value={businessName} onChange={setBusinessName} />
                   <InputField icon="call-outline" placeholder={`${t('phone')} *`} value={businessPhone} onChange={setBusinessPhone} keyboardType="phone-pad" />
                   <InputField icon="location-outline" placeholder={t('auth_city_ph')} value={businessCity} onChange={setBusinessCity} />
@@ -677,25 +572,6 @@ export default function Login() {
               )}
 
               <SubmitBtn loading={loading} label={mode === 'login' ? t('auth_login') : t('auth_register')} onPress={handleSubmit} />
-
-              {/* OAuth */}
-              <View style={s.dividerRow}>
-                <View style={s.dividerLine} />
-                <Text style={s.dividerTxt}>{t('auth_or')}</Text>
-                <View style={s.dividerLine} />
-              </View>
-
-              <TouchableOpacity style={s.oauthBtn} onPress={handleGoogleSignIn} disabled={loading} activeOpacity={0.85}>
-                <Ionicons name="logo-google" size={19} color="#EA4335" />
-                <Text style={s.oauthBtnTxt}>{t('auth_google_btn')}</Text>
-              </TouchableOpacity>
-
-              {Platform.OS === 'ios' && appleAvailable && (
-                <TouchableOpacity style={[s.oauthBtn, { backgroundColor: '#000', borderColor: '#000' }]} onPress={handleAppleSignIn} disabled={loading} activeOpacity={0.85}>
-                  <Ionicons name="logo-apple" size={19} color="#fff" />
-                  <Text style={[s.oauthBtnTxt, { color: '#fff' }]}>{t('auth_apple_btn')}</Text>
-                </TouchableOpacity>
-              )}
 
               {mode === 'login' && (
                 <View style={s.switchRow}>
@@ -833,6 +709,14 @@ const s = StyleSheet.create({
   tabTxtActive: { color: '#fff' },
 
   sectionLabel: { fontSize: 11, fontWeight: '800', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10, marginTop: 4 },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 6 },
+  sectorBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F9FAFB', borderRadius: 14, borderWidth: 1.5, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 14, marginBottom: 8 },
+  sectorBtnTxt: { flex: 1, fontSize: 15, color: '#111827', fontWeight: '600' },
+  sectorDropdown: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#E5E7EB', marginBottom: 12, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
+  sectorOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  sectorOptionActive: { backgroundColor: '#F5F3FF' },
+  sectorOptionTxt: { fontSize: 14, color: '#374151', fontWeight: '500' },
+  sectorOptionTxtActive: { color: '#7C3AED', fontWeight: '700' },
   fieldWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 14, borderWidth: 1.5, borderColor: '#E5E7EB', marginBottom: 12, overflow: 'hidden' },
   fieldIcon: { width: 48, alignItems: 'center', justifyContent: 'center', paddingVertical: 16 },
   field: { flex: 1, fontSize: 15, color: '#111827', paddingVertical: 16, paddingRight: 14 },
@@ -853,12 +737,6 @@ const s = StyleSheet.create({
 
   btn: { backgroundColor: '#7C3AED', padding: 17, borderRadius: 14, alignItems: 'center', marginTop: 4, shadowColor: '#7C3AED', shadowOpacity: 0.4, shadowRadius: 12, elevation: 6 },
   btnTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
-
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
-  dividerTxt: { fontSize: 12, color: '#9CA3AF', fontWeight: '600' },
-  oauthBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 14, padding: 14, marginBottom: 10, backgroundColor: '#fff' },
-  oauthBtnTxt: { fontSize: 14, fontWeight: '700', color: '#374151' },
 
   switchRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 18 },
   switchTxt: { fontSize: 13, color: '#6B7280' },

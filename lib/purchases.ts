@@ -38,6 +38,12 @@ export async function initPurchases(userId?: string) {
   Purchases.setLogLevel(LOG_LEVEL.ERROR)
   Purchases.configure({ apiKey, appUserID: userId ?? null })
   _configured = true
+
+  // RC offerings logla — paket ID'lerini doğrulamak için
+  Purchases.getOfferings().then((o) => {
+    const pkgs = o.current?.availablePackages ?? []
+    console.log('[RevenueCat] offerings:', pkgs.map(p => p.product.identifier))
+  }).catch(() => {})
 }
 
 // ─── Mevcut teklifleri getir ──────────────────────────────────────────────────
