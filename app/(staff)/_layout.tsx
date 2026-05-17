@@ -1,8 +1,13 @@
-import { useRef, useEffect } from 'react'
-import { Platform, View, Animated, StyleSheet } from 'react-native'
-import { Tabs } from 'expo-router'
+import { useRef, useEffect, useState } from 'react'
+import { Platform, View, Animated, StyleSheet, Text } from 'react-native'
+import { Tabs, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useCallback } from 'react'
+import { PUSH_NOTIFS_KEY, type StoredPushNotif } from '../_layout'
+
+const STAFF_READ_KEY = 'staff_push_read_ids'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -33,8 +38,30 @@ const ti = StyleSheet.create({
   pill: { position: 'absolute', width: 40, height: 28, borderRadius: 14 },
 })
 
+const badge = StyleSheet.create({
+  wrap: { position: 'absolute', top: -2, right: -4, backgroundColor: '#EF4444', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  txt: { color: '#fff', fontSize: 9, fontWeight: '800' },
+})
+
 export default function StaffLayout() {
   const { t } = useTranslation()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  const refreshBadge = useCallback(async () => {
+    try {
+      const [pushRaw, readRaw] = await Promise.all([
+        AsyncStorage.getItem(PUSH_NOTIFS_KEY),
+        AsyncStorage.getItem(STAFF_READ_KEY),
+      ])
+      const notifs: StoredPushNotif[] = pushRaw ? JSON.parse(pushRaw) : []
+      const readIds: Set<string> = readRaw ? new Set(JSON.parse(readRaw)) : new Set()
+      const now = Date.now()
+      const count = notifs.filter(n => !n.read && !readIds.has(n.id) && now - n.receivedAt < 24 * 60 * 60 * 1000).length
+      setUnreadCount(count)
+    } catch {}
+  }, [])
+
+  useEffect(() => { refreshBadge() }, [refreshBadge])
 
   return (
     <Tabs
@@ -78,6 +105,23 @@ export default function StaffLayout() {
           tabBarActiveTintColor: '#2563EB',
           tabBarIcon: ({ focused }) => (
             <TabBarIcon focused={focused} color="#2563EB" bg="#EFF6FF" icon="people" iconOutline="people-outline" />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="bildirimler"
+        options={{
+          title: t('notifications'),
+          tabBarActiveTintColor: '#D97706',
+          tabBarIcon: ({ focused }) => (
+            <View>
+              <TabBarIcon focused={focused} color="#D97706" bg="#FFFBEB" icon="notifications" iconOutline="notifications-outline" />
+              {unreadCount > 0 && (
+                <View style={badge.wrap}>
+                  <Text style={badge.txt}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />

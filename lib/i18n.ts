@@ -692,6 +692,7 @@ const tr = {
   staff_portal_appointments: 'Randevularım',
   staff_portal_customers: 'Müşteriler',
   staff_portal_profile: 'Profilim',
+  staff_notif_sub: 'Randevu ve hatırlatma bildirimleri',
   staff_portal_noAppointments: 'Bugün randevunuz yok',
 
   // ── Hata mesajları ───────────────────────────────────────────
@@ -2187,6 +2188,7 @@ const en: typeof tr = {
   staff_portal_appointments: 'My Appointments',
   staff_portal_customers: 'Customers',
   staff_portal_profile: 'My Profile',
+  staff_notif_sub: 'Appointment and reminder notifications',
   staff_portal_noAppointments: 'No appointments today',
 
   err_general: 'An error occurred. Please try again.',
@@ -3614,6 +3616,7 @@ const de: typeof tr = {
   staff_portal_appointments: 'Meine Termine',
   staff_portal_customers: 'Kunden',
   staff_portal_profile: 'Mein Profil',
+  staff_notif_sub: 'Termin- und Erinnerungsbenachrichtigungen',
   staff_portal_noAppointments: 'Heute keine Termine',
   err_general: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
   err_network: 'Verbindungsfehler. Überprüfen Sie Ihre Internetverbindung.',
@@ -5025,6 +5028,7 @@ const ar: typeof tr = {
   staff_portal_appointments: 'مواعيدي',
   staff_portal_customers: 'العملاء',
   staff_portal_profile: 'ملفي الشخصي',
+  staff_notif_sub: 'إشعارات المواعيد والتذكيرات',
   staff_portal_noAppointments: 'لا مواعيد اليوم',
   err_general: 'حدث خطأ. يرجى المحاولة مرة أخرى.',
   err_network: 'خطأ في الاتصال. تحقق من اتصالك بالإنترنت.',
