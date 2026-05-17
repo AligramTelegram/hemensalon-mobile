@@ -422,6 +422,7 @@ export type TenantProfile = {
   email?: string
   address?: string
   country?: string
+  sector?: string
   plan: string
   planEndsAt?: string
   trialEndsAt?: string
@@ -473,6 +474,7 @@ export const api = {
   },
   pushToken: {
     register: (pushToken: string) => patch('/api/me/push-token', { pushToken }),
+    registerStaff: (token: string) => post('/api/staff/push-token', { token }),
   },
   staff: {
     list: () => get<Staff[]>('/api/staff', { all: 'true' }),

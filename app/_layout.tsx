@@ -89,6 +89,20 @@ export default function RootLayout() {
         }
       }
 
+      // Staff oturumu için push token kaydet
+      const freshStaffToken = await secureStorage.getItem('staff_token')
+      if (freshStaffToken) {
+        try {
+          const { status } = await Notifications.requestPermissionsAsync()
+          if (status === 'granted') {
+            const tokenData = await Notifications.getExpoPushTokenAsync()
+            await api.pushToken.registerStaff(tokenData.data)
+          }
+        } catch (e) {
+          console.warn('[Notifications] staff push token failed:', e)
+        }
+      }
+
       setReady(true);
     }
     setup();
