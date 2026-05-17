@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, Platform, Animated, Easing,
+  RefreshControl, Platform, Animated, Easing, Pressable,
   Alert,
 } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
@@ -94,7 +94,7 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [data, country, { data: { user } }, products, usageData, notifs, readIdsRaw, allCustomers] = await Promise.all([
+      const [data, country, { data: { user } }, products, usageData, notifs, readIdsRaw, allCustomers, tenantProfile] = await Promise.all([
         api.dashboard.stats(),
         detectCountry(),
         supabase.auth.getUser(),
@@ -103,11 +103,12 @@ export default function Dashboard() {
         api.notifications.list().catch(() => []),
         AsyncStorage.getItem('read_notification_ids').catch(() => null),
         api.customers.list().catch(() => [] as Customer[]),
+        api.tenant.get().catch(() => null),
       ])
       setStats(data)
       setUsage(usageData)
       setSymbol(getPricing(country).symbol)
-      setUserName(user?.email?.split('@')[0] ?? '')
+      setUserName(tenantProfile?.name || (user?.email?.split('@')[0] ?? ''))
       setLowStockProducts(products.filter(p => p.isActive && p.quantity <= p.minQuantity))
       const readIds: Set<string> = readIdsRaw ? new Set(JSON.parse(readIdsRaw)) : new Set()
       setUnreadNotifCount(notifs.filter(n => n.isNew && !readIds.has(n.id)).length)
@@ -132,7 +133,7 @@ export default function Dashboard() {
 
   useEffect(() => { load() }, [load])
 
-  // 5 dakikada bir otomatik yenile
+  // 1 dakikada bir otomatik yenile
   useEffect(() => {
     const interval = setInterval(async () => {
       setAutoRefreshing(true)
@@ -140,12 +141,12 @@ export default function Dashboard() {
       await load()
       setAutoRefreshing(false)
       stopSpinAnim()
-    }, 5 * 60 * 1000)
+    }, 60 * 1000)
     return () => clearInterval(interval)
   }, [load, startSpinAnim, stopSpinAnim])
 
-  // Sayfaya odaklanınca yenile — ama son yüklemeden 90 saniye geçmediyse atlat
-  const FOCUS_STALE_MS = 90_000
+  // Sayfaya odaklanınca yenile — ama son yüklemeden 30 saniye geçmediyse atlat
+  const FOCUS_STALE_MS = 30_000
   useFocusEffect(
     useCallback(() => {
       if (!loading && Date.now() - lastLoadedAt.current > FOCUS_STALE_MS) {
@@ -241,8 +242,15 @@ export default function Dashboard() {
 
           {/* Üst satır */}
           <View style={s.heroTopRow}>
-            <View style={s.avatarBox}>
-              <Text style={s.avatarTxt}>{userName.charAt(0).toUpperCase() || 'S'}</Text>
+            <View style={s.avatarRing}>
+              <View style={s.avatarBox}>
+                <Text style={s.avatarTxt}>
+                  {userName.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'S'}
+                </Text>
+              </View>
+              <View style={s.avatarBadge}>
+                <Ionicons name="checkmark" size={9} color="#fff" />
+              </View>
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={s.greetingTxt}>{greeting}</Text>
@@ -649,13 +657,46 @@ export default function Dashboard() {
 }
 
 function QuickAction({ iconName, label, onPress }: { iconName: IoniconsName; label: string; onPress: () => void }) {
+  const scale     = useRef(new Animated.Value(1)).current
+  const iconScale = useRef(new Animated.Value(1)).current
+  const iconY     = useRef(new Animated.Value(0)).current
+
+  const handlePressIn = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(scale,     { toValue: 0.90, useNativeDriver: true, tension: 500, friction: 8 }),
+      Animated.spring(iconScale, { toValue: 0.80, useNativeDriver: true, tension: 500, friction: 8 }),
+      Animated.timing(iconY,     { toValue: 2, duration: 80, useNativeDriver: true }),
+    ]).start()
+  }, [])
+
+  const handlePressOut = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(scale,     { toValue: 1,  useNativeDriver: true, tension: 300, friction: 6 }),
+      Animated.sequence([
+        Animated.spring(iconScale, { toValue: 1.25, useNativeDriver: true, tension: 400, friction: 5 }),
+        Animated.spring(iconScale, { toValue: 1,    useNativeDriver: true, tension: 300, friction: 8 }),
+      ]),
+      Animated.sequence([
+        Animated.spring(iconY, { toValue: -6, useNativeDriver: true, tension: 400, friction: 5 }),
+        Animated.spring(iconY, { toValue: 0,  useNativeDriver: true, tension: 300, friction: 8 }),
+      ]),
+    ]).start()
+  }, [])
+
   return (
-    <TouchableOpacity style={s.qaBtn} onPress={onPress} activeOpacity={0.7}>
-      <View style={s.qaIcon}>
-        <Ionicons name={iconName} size={20} color="#fff" />
-      </View>
+    <Pressable
+      style={s.qaBtn}
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Animated.View style={[s.qaIcon, { transform: [{ scale: iconScale }, { translateY: iconY }] }]}>
+          <Ionicons name={iconName} size={20} color="#fff" />
+        </Animated.View>
+      </Animated.View>
       <Text style={s.qaLabel}>{label}</Text>
-    </TouchableOpacity>
+    </Pressable>
   )
 }
 
@@ -724,12 +765,25 @@ const s = StyleSheet.create({
 
   // Üst satır
   heroTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+  avatarRing: {
+    width: 50, height: 50, borderRadius: 25,
+    borderWidth: 2.5, borderColor: '#2DD4BF',
+    justifyContent: 'center', alignItems: 'center',
+    padding: 2,
+  },
   avatarBox: {
-    width: 42, height: 42, borderRadius: 13,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.22)',
     justifyContent: 'center', alignItems: 'center',
   },
-  avatarTxt: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  avatarBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#2DD4BF',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#7C3AED',
+  },
+  avatarTxt: { fontSize: 15, fontWeight: '800', color: '#fff' },
   greetingTxt: { fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '500' },
   heroName: { fontSize: 17, fontWeight: '800', color: '#fff', textTransform: 'capitalize' },
   notifBtn: {
