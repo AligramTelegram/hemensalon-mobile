@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.hemensalon.mobile",
+      "bundleIdentifier": "com.appointly.app",
       "buildNumber": "1",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Müşteri profil fotoğrafı eklemek için galeri erişimi gereklidir.",
