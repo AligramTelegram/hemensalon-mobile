@@ -7,9 +7,28 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:648915913429:android:1475c67d1eeb40121e705c",
+        "mobilesdk_app_id": "1:648915913429:android:69323af7b9ffd82f1e705c",
         "android_client_info": {
           "package_name": "com.appointly.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAOJZyui08YnXsHXFdJYodfRGzj6RipiU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:648915913429:android:1475c67d1eeb40121e705c",
+        "android_client_info": {
+          "package_name": "com.hemensalon.mobile"
         }
       },
       "oauth_client": [],
