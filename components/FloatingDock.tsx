@@ -35,46 +35,36 @@ function DockItem({ tab, focused, onPress }: { tab: TabConfig; focused: boolean;
   const scale      = useRef(new Animated.Value(1)).current
   const translateY = useRef(new Animated.Value(0)).current
   const dotOpacity = useRef(new Animated.Value(0)).current
-  const iconRotate = useRef(new Animated.Value(0)).current
-  const bgOpacity  = useRef(new Animated.Value(focused ? 1 : 0)).current
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(scale,      { toValue: focused ? 1.18 : 1, useNativeDriver: true, tension: 320, friction: 12 }),
-      Animated.spring(translateY, { toValue: focused ? -5 : 0,   useNativeDriver: true, tension: 320, friction: 12 }),
-      Animated.timing(dotOpacity, { toValue: focused ? 1 : 0,    duration: 180, useNativeDriver: true }),
-      Animated.timing(bgOpacity,  { toValue: focused ? 1 : 0,    duration: 180, useNativeDriver: true }),
+      Animated.spring(scale,      { toValue: focused ? 1.15 : 1, useNativeDriver: true, tension: 300, friction: 14 }),
+      Animated.spring(translateY, { toValue: focused ? -3 : 0,   useNativeDriver: true, tension: 300, friction: 14 }),
+      Animated.timing(dotOpacity, { toValue: focused ? 1 : 0,    duration: 200, useNativeDriver: true }),
     ]).start()
   }, [focused])
 
   const handlePressIn = useCallback(() => {
-    Animated.parallel([
-      Animated.spring(scale, { toValue: 0.82, useNativeDriver: true, tension: 500, friction: 8 }),
-      Animated.timing(iconRotate, { toValue: 1, duration: 120, useNativeDriver: true }),
-    ]).start()
+    Animated.spring(scale, { toValue: 0.85, useNativeDriver: true, tension: 400, friction: 10 }).start()
   }, [])
 
   const handlePressOut = useCallback(() => {
-    Animated.parallel([
-      Animated.spring(scale,      { toValue: focused ? 1.18 : 1, useNativeDriver: true, tension: 280, friction: 8 }),
-      Animated.spring(translateY, { toValue: focused ? -5 : 0,   useNativeDriver: true, tension: 280, friction: 8 }),
-      Animated.timing(iconRotate, { toValue: 0, duration: 100, useNativeDriver: true }),
+    Animated.sequence([
+      Animated.spring(scale, { toValue: focused ? 1.22 : 1.08, useNativeDriver: true, tension: 400, friction: 6 }),
+      Animated.spring(scale, { toValue: focused ? 1.15 : 1,    useNativeDriver: true, tension: 300, friction: 14 }),
     ]).start()
   }, [focused])
-
-  const rotate = iconRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-12deg'] })
 
   return (
     <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={s.item}>
       <Animated.View style={[s.itemInner, { transform: [{ scale }, { translateY }] }]}>
-        <Animated.View style={[s.iconWrap, { opacity: bgOpacity.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }), backgroundColor: tab.color + '20', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 14 }]} />
-        <Animated.View style={{ transform: [{ rotate }] }}>
+        <View style={[s.iconWrap, focused && { backgroundColor: tab.color + '18' }]}>
           <Ionicons
             name={focused ? tab.icon : tab.iconOutline}
             size={26}
             color={focused ? tab.color : '#B0B0BE'}
           />
-        </Animated.View>
+        </View>
         <Animated.View style={[s.dot, { backgroundColor: tab.color, opacity: dotOpacity }]} />
       </Animated.View>
     </Pressable>
