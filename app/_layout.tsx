@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { FloatingDock } from '@/components/FloatingDock';
+import { SplashAnimation } from '@/components/SplashAnimation';
 import { detectCountry } from '@/lib/pricing';
 import { initI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -20,6 +22,7 @@ Notifications.setNotificationHandler({
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [staffToken, setStaffToken] = useState<string | null>(null);
   const router = useRouter();
@@ -31,6 +34,21 @@ export default function RootLayout() {
       await initI18n(country);
       I18nManager.forceRTL(isRTL());
 
+      // 24 saatlik oturum süresi kontrolü
+      const SESSION_TTL = 24 * 60 * 60 * 1000
+      const loginTimeStr = await secureStorage.getItem('login_time')
+      if (loginTimeStr) {
+        const elapsed = Date.now() - parseInt(loginTimeStr, 10)
+        if (elapsed > SESSION_TTL) {
+          await supabase.auth.signOut()
+          await secureStorage.removeItem('mobile_token')
+          await secureStorage.removeItem('refresh_token')
+          await secureStorage.removeItem('staff_token')
+          await secureStorage.removeItem('staff_data')
+          await secureStorage.removeItem('login_time')
+        }
+      }
+
       // Supabase session kontrolü
       const { data: { session: s } } = await supabase.auth.getSession();
       setSession(s);
@@ -41,9 +59,10 @@ export default function RootLayout() {
 
       if (s) {
         try {
-          // RevenueCat'i kullanıcı ID'siyle başlat
           await initPurchases(s.user.id)
-        } catch {}
+        } catch (e) {
+          console.warn('[RevenueCat] initPurchases failed:', e)
+        }
         try {
           const { status } = await Notifications.requestPermissionsAsync();
           if (status === 'granted') {
@@ -51,7 +70,9 @@ export default function RootLayout() {
             await api.pushToken.register(tokenData.data);
             await scheduleTips();
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[Notifications] setup failed:', e)
+        }
       }
 
       setReady(true);
@@ -67,6 +88,7 @@ export default function RootLayout() {
         secureStorage.removeItem('staff_data');
         secureStorage.removeItem('mobile_token');
         secureStorage.removeItem('refresh_token');
+        secureStorage.removeItem('login_time');
         setStaffToken(null);
       }
     });
@@ -145,7 +167,11 @@ export default function RootLayout() {
           }
         } catch (e) {
           console.warn('Route guard access check failed:', e)
-          // Hata durumunda kullanıcıyı kilitlememek için paywall yönlendirmesini atla
+          // 401 = token geçersiz → oturumu temizle ve login'e yönlendir
+          if (e instanceof Error && (e.message.includes('Yetkisiz') || e.message.includes('401'))) {
+            await supabase.auth.signOut()
+            router.replace('/(auth)/login')
+          }
         }
       }
     }
@@ -154,8 +180,8 @@ export default function RootLayout() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FAF8FF' }}>
-        <ActivityIndicator size="large" color="#7C3AED" />
+      <View style={{ flex: 1, backgroundColor: '#7C3AED' }}>
+        <SplashAnimation onFinish={() => {}} />
       </View>
     );
   }
@@ -167,8 +193,8 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)/onboarding" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(staff)" />
-        <Stack.Screen name="hizmetler" />
-        <Stack.Screen name="calisanlar" />
+        <Stack.Screen name="hizmetler" options={{ animation: 'none' }} />
+        <Stack.Screen name="calisanlar" options={{ animation: 'none' }} />
         <Stack.Screen name="finans" />
         <Stack.Screen name="ayarlar" />
         <Stack.Screen name="raporlar" />
@@ -184,6 +210,8 @@ export default function RootLayout() {
         <Stack.Screen name="arama" />
         <Stack.Screen name="deneme-bitti" options={{ gestureEnabled: false }} />
       </Stack>
+      <FloatingDock />
+      {!splashDone && <SplashAnimation onFinish={() => setSplashDone(true)} />}
     </ThemeProvider>
   );
 }
