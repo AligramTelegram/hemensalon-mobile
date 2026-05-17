@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { api, Notification } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
+import { PUSH_NOTIFS_KEY, type StoredPushNotif } from './_layout'
 
 const READ_KEY = 'read_notification_ids'
 
@@ -42,6 +43,7 @@ export default function Bildirimler() {
   const headerPad = useHeaderPad()
   const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [pushNotifs, setPushNotifs] = useState<StoredPushNotif[]>([])
   const [readIds, setReadIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -49,9 +51,14 @@ export default function Bildirimler() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [list, ids] = await Promise.all([api.notifications.list(), getReadIds()])
+      const [list, ids, pushRaw] = await Promise.all([
+        api.notifications.list(),
+        getReadIds(),
+        AsyncStorage.getItem(PUSH_NOTIFS_KEY).catch(() => null),
+      ])
       setNotifications(list)
       setReadIds(ids)
+      setPushNotifs(pushRaw ? JSON.parse(pushRaw) : [])
     } catch (e) {
       console.warn('load notifications failed:', e)
       setNotifications([])
@@ -69,8 +76,22 @@ export default function Bildirimler() {
     setReadIds(prev => new Set([...prev, id]))
   }
 
+  async function handlePushPress(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    const updated = pushNotifs.map(n => n.id === id ? { ...n, read: true } : n)
+    setPushNotifs(updated)
+    await AsyncStorage.setItem(PUSH_NOTIFS_KEY, JSON.stringify(updated))
+  }
+
+  // Son 24 saatte gelen push'lar "yeni"
+  const now = Date.now()
+  const newPush = pushNotifs.filter(n => !n.read && now - n.receivedAt < 24 * 60 * 60 * 1000)
+  const oldPush = pushNotifs.filter(n => n.read || now - n.receivedAt >= 24 * 60 * 60 * 1000)
+
   const newNotifs = notifications.filter(n => n.isNew && !readIds.has(n.id))
   const oldNotifs = notifications.filter(n => !n.isNew || readIds.has(n.id))
+
+  const totalNew = newPush.length + newNotifs.length
 
   return (
     <View style={s.root}>
@@ -81,9 +102,9 @@ export default function Bildirimler() {
           <TouchableOpacity onPress={() => router.back()} style={s.back}>
             <Ionicons name="chevron-back" size={26} color="#fff" />
           </TouchableOpacity>
-          {newNotifs.length > 0 && (
+          {totalNew > 0 && (
             <View style={s.headerBadge}>
-              <Text style={s.headerBadgeTxt}>{t('notif_new_badge', { count: newNotifs.length })}</Text>
+              <Text style={s.headerBadgeTxt}>{t('notif_new_badge', { count: totalNew })}</Text>
             </View>
           )}
         </View>
@@ -97,30 +118,45 @@ export default function Bildirimler() {
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}
         >
-          {newNotifs.length > 0 && (
+          {/* ── Yeni push bildirimleri ── */}
+          {newPush.length > 0 && (
             <>
               <Text style={s.sectionLabel}>{t('notifications_new')}</Text>
+              {newPush.map(n => (
+                <PushRow key={n.id} n={n} isNew onPress={() => handlePushPress(n.id)} />
+              ))}
+            </>
+          )}
+
+          {/* ── Yeni randevu bildirimleri ── */}
+          {newNotifs.length > 0 && (
+            <>
+              <Text style={[s.sectionLabel, { marginTop: newPush.length > 0 ? 16 : 0 }]}>
+                {t('notif_section_appointments')}
+              </Text>
               {newNotifs.map(n => (
                 <NotifRow key={n.id} n={n} isNew onPress={() => handleNotifPress(n.id)} />
               ))}
             </>
           )}
 
-          {oldNotifs.length > 0 && (
+          {/* ── Eski bildirimler ── */}
+          {(oldPush.length > 0 || oldNotifs.length > 0) && (
             <>
-              <Text style={[s.sectionLabel, { marginTop: newNotifs.length > 0 ? 20 : 0 }]}>
-                {t('notif_section_old')}
-              </Text>
+              <Text style={[s.sectionLabel, { marginTop: 20 }]}>{t('notif_section_old')}</Text>
+              {oldPush.map(n => (
+                <PushRow key={n.id} n={n} isNew={false} onPress={() => {}} />
+              ))}
               {oldNotifs.map(n => (
                 <NotifRow key={n.id} n={n} isNew={false} onPress={() => {}} />
               ))}
             </>
           )}
 
-          {notifications.length === 0 && (
+          {pushNotifs.length === 0 && notifications.length === 0 && (
             <View style={s.emptyWrap}>
               <Ionicons name="notifications-off-outline" size={56} color="#E5E7EB" />
               <Text style={s.emptyTxt}>{t('notifications_empty')}</Text>
@@ -129,6 +165,42 @@ export default function Bildirimler() {
         </ScrollView>
       )}
     </View>
+  )
+}
+
+function PushRow({ n, isNew, onPress }: { n: StoredPushNotif; isNew: boolean; onPress: () => void }) {
+  const timeAgo = (() => {
+    const diff = Date.now() - n.receivedAt
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return '< 1dk'
+    if (mins < 60) return `${mins}dk`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}sa`
+    return `${Math.floor(hrs / 24)}g`
+  })()
+
+  const type = (n.data?.type as string) ?? ''
+  const iconName = type === 'new_appointment' ? 'calendar' :
+                   type === 'appointment_status' ? 'checkmark-circle' : 'notifications'
+  const iconColor = type === 'new_appointment' ? '#7C3AED' :
+                    type === 'appointment_status' ? '#059669' : '#2563EB'
+  const iconBg = type === 'new_appointment' ? '#EDE9FE' :
+                 type === 'appointment_status' ? '#ECFDF5' : '#EFF6FF'
+
+  return (
+    <TouchableOpacity style={[nr.row, isNew && nr.rowNew]} onPress={onPress} activeOpacity={0.75}>
+      <View style={[nr.icon, { backgroundColor: iconBg }]}>
+        <Ionicons name={iconName as never} size={18} color={iconColor} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Text style={[nr.customer, { flex: 1, marginRight: 8 }]} numberOfLines={1}>{n.title}</Text>
+          <Text style={nr.timeAgo}>{timeAgo}</Text>
+        </View>
+        <Text style={nr.service} numberOfLines={2}>{n.body}</Text>
+      </View>
+      {isNew && <View style={nr.dot} />}
+    </TouchableOpacity>
   )
 }
 

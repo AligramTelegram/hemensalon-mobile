@@ -20,6 +20,17 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true, shouldShowBanner: true, shouldShowList: true }),
 });
 
+export const PUSH_NOTIFS_KEY = 'push_notifications_log'
+
+export interface StoredPushNotif {
+  id: string
+  title: string
+  body: string
+  data?: Record<string, unknown>
+  receivedAt: number
+  read: boolean
+}
+
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
@@ -82,6 +93,25 @@ export default function RootLayout() {
     }
     setup();
 
+    // Gelen push bildirimlerini AsyncStorage'a kaydet
+    const notifSub = Notifications.addNotificationReceivedListener(async (notif) => {
+      try {
+        const raw = await AsyncStorage.getItem(PUSH_NOTIFS_KEY)
+        const list: StoredPushNotif[] = raw ? JSON.parse(raw) : []
+        const newEntry: StoredPushNotif = {
+          id: notif.request.identifier,
+          title: notif.request.content.title ?? '',
+          body: notif.request.content.body ?? '',
+          data: (notif.request.content.data ?? {}) as Record<string, unknown>,
+          receivedAt: Date.now(),
+          read: false,
+        }
+        // Sonundan 50 adet tut
+        const updated = [newEntry, ...list].slice(0, 50)
+        await AsyncStorage.setItem(PUSH_NOTIFS_KEY, JSON.stringify(updated))
+      } catch {}
+    })
+
     const sub = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
       // Sadece aktif çıkış yapıldığında staff verilerini temizle
@@ -96,8 +126,8 @@ export default function RootLayout() {
       }
     });
 
-    // Supabase v2'de dönüş tipine göre (subscription objesi ya doğrudan ya da data içinde olabilir)
     return () => {
+      notifSub.remove()
       const anySub = sub as any
       const subscription = anySub?.subscription
       if (subscription?.unsubscribe) subscription.unsubscribe()
