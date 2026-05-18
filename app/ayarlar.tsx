@@ -31,6 +31,20 @@ type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 type Tab = 'isletme' | 'calisma' | 'entegrasyon'
 
 const PLAN_COLOR: Record<string, string> = { BASLANGIC: '#2563EB', PROFESYONEL: '#7C3AED', ISLETME: '#D97706' }
+
+const SECTORS: { key: string; icon: IoniconsName }[] = [
+  { key: 'HAIR',      icon: 'cut-outline' },
+  { key: 'BARBER',    icon: 'man-outline' },
+  { key: 'NAIL',      icon: 'color-palette-outline' },
+  { key: 'SPA',       icon: 'leaf-outline' },
+  { key: 'AESTHETIC', icon: 'sparkles-outline' },
+  { key: 'MAKEUP',    icon: 'brush-outline' },
+  { key: 'TATTOO',    icon: 'pencil-outline' },
+  { key: 'PHYSIO',    icon: 'fitness-outline' },
+  { key: 'DENTAL',    icon: 'medkit-outline' },
+  { key: 'VET',       icon: 'paw-outline' },
+  { key: 'OTHER',     icon: 'ellipsis-horizontal-outline' },
+]
 const HOURS = Array.from({ length: 29 }, (_, i) => {
   const h = Math.floor(i / 2) + 6
   const m = i % 2 === 0 ? '00' : '30'
@@ -48,14 +62,15 @@ export default function Ayarlar() {
   const { t } = useTranslation()
   const headerPad = useHeaderPad()
   const router = useRouter()
-  const { isDark, toggle: toggleTheme } = useTheme()
+  useTheme() // ileride dark mode için
   const [profile, setProfile] = useState<TenantProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('isletme')
 
   // İşletme formu
-  const [form, setForm] = useState({ name: '', phone: '', email: '', address: '' })
+  const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', sector: 'HAIR' })
   const [saving, setSaving] = useState(false)
+  const [showSectorPicker, setShowSectorPicker] = useState(false)
 
   // Yerel tercihler
   const [currency, setCurrency] = useState('TRY')
@@ -84,7 +99,7 @@ export default function Ayarlar() {
         AsyncStorage.getItem('pref_timezone'),
       ])
       setProfile(p)
-      setForm({ name: p.name, phone: p.phone ?? '', email: p.email ?? '', address: p.address ?? '' })
+      setForm({ name: p.name, phone: p.phone ?? '', email: p.email ?? '', address: p.address ?? '', sector: p.sector ?? 'HAIR' })
       if (wh.length > 0) setHours(wh)
       if (cur) setCurrency(cur)
       if (lang) setLanguage(lang)
@@ -123,6 +138,7 @@ export default function Ayarlar() {
         phone: form.phone.trim() || undefined,
         email: form.email.trim() || undefined,
         address: form.address.trim() || undefined,
+        sector: form.sector,
       })
       setProfile(prev => prev ? { ...prev, ...updated } : prev)
       Alert.alert(t('success'), t('settings_saved'))
@@ -213,6 +229,31 @@ export default function Ayarlar() {
       {tab === 'isletme' && (
         <ScrollView style={s.body} keyboardShouldPersistTaps="handled">
           <SectionCard title={t('settings_business')}>
+            {/* Sektör seçici */}
+            <Text style={s.fieldLabelSm}>{t('settings_sector')}</Text>
+            <TouchableOpacity style={s.sectorBtn} onPress={() => { Haptics.selectionAsync(); setShowSectorPicker(v => !v) }}>
+              <Ionicons name={SECTORS.find(sec => sec.key === form.sector)?.icon ?? 'cut-outline'} size={17} color="#7C3AED" />
+              <Text style={s.sectorBtnTxt}>{t(`sector_${form.sector}`)}</Text>
+              <Ionicons name={showSectorPicker ? 'chevron-up' : 'chevron-down'} size={15} color="#9CA3AF" />
+            </TouchableOpacity>
+            {showSectorPicker && (
+              <View style={s.sectorDropdown}>
+                {SECTORS.map(sec => (
+                  <TouchableOpacity
+                    key={sec.key}
+                    style={[s.sectorOption, form.sector === sec.key && s.sectorOptionActive]}
+                    onPress={() => { Haptics.selectionAsync(); setForm(f => ({ ...f, sector: sec.key })); setShowSectorPicker(false) }}
+                  >
+                    <Ionicons name={sec.icon} size={15} color={form.sector === sec.key ? '#7C3AED' : '#6B7280'} />
+                    <Text style={[s.sectorOptionTxt, form.sector === sec.key && s.sectorOptionTxtActive]}>
+                      {t(`sector_${sec.key}`)}
+                    </Text>
+                    {form.sector === sec.key && <Ionicons name="checkmark" size={14} color="#7C3AED" style={{ marginLeft: 'auto' }} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             <Field label={`${t('settings_businessName')} *`} value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder={t('settings_salon_name_placeholder')} />
             <Field label={t('phone')} value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} placeholder="05XX XXX XX XX" keyboardType="phone-pad" />
             <Field label={t('email')} value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="info@salon.com" keyboardType="email-address" />
@@ -297,19 +338,6 @@ export default function Ayarlar() {
                 {timezone === tz.code && <Ionicons name="checkmark" size={16} color="#7C3AED" style={{ marginLeft: 'auto' }} />}
               </TouchableOpacity>
             ))}
-
-            <View style={[s.darkModeRow, { marginTop: 12 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="moon-outline" size={18} color="#7C3AED" />
-                <Text style={s.prefLabel}>{t('darkMode')}</Text>
-              </View>
-              <Switch
-                value={isDark}
-                onValueChange={toggleTheme}
-                trackColor={{ false: '#E5E7EB', true: '#C4B5FD' }}
-                thumbColor={isDark ? '#7C3AED' : '#9CA3AF'}
-              />
-            </View>
 
             <TouchableOpacity style={[s.saveBtn, { marginTop: 16 }]} onPress={handleSavePrefs}>
               <Text style={s.saveTxt}>{t('settings_save_prefs')}</Text>
@@ -658,4 +686,12 @@ const s = StyleSheet.create({
   tzRowActive: { borderColor: '#7C3AED', backgroundColor: '#EDE9FE' },
   tzTxt: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
   tzTxtActive: { color: '#7C3AED', fontWeight: '700' },
+  fieldLabelSm: { fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 6 },
+  sectorBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', paddingHorizontal: 12, paddingVertical: 12, marginBottom: 10 },
+  sectorBtnTxt: { flex: 1, fontSize: 14, color: '#111827', fontWeight: '600' },
+  sectorDropdown: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', marginBottom: 12, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, elevation: 3 },
+  sectorOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  sectorOptionActive: { backgroundColor: '#F5F3FF' },
+  sectorOptionTxt: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  sectorOptionTxtActive: { color: '#7C3AED', fontWeight: '700' },
 })

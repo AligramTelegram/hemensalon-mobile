@@ -164,7 +164,7 @@ async function handleUpgrade(planKey: string) {
         </TouchableOpacity>
         <View style={s.heroContent}>
           <View style={[s.planIconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-            <Ionicons name={currentPlan.icon} size={28} color="#fff" />
+            <Ionicons name={currentPlan.icon} size={18} color="#fff" />
           </View>
           <Text style={s.heroLabel}>{t('sub_current_plan')}</Text>
           <Text style={s.heroTitle}>{t(currentPlan.labelKey)}</Text>
@@ -241,67 +241,97 @@ async function handleUpgrade(planKey: string) {
           {PLANS.map(plan => {
             const isCurrent = plan.key === profile?.plan
             const isDowngrade = PLANS.findIndex(p => p.key === plan.key) < PLANS.findIndex(p => p.key === profile?.plan)
+            const priceStr = planPrice(plan.key)
             return (
               <View key={plan.key} style={[s.planCard, isCurrent && { borderColor: plan.color, borderWidth: 2 }]}>
-                {plan.popular && !isCurrent && (
-                  <View style={[s.popularBadge, { backgroundColor: plan.color }]}>
-                    <Text style={s.popularTxt}>{t('sub_popular_badge')}</Text>
-                  </View>
-                )}
-                {isCurrent && (
-                  <View style={[s.currentBadge, { backgroundColor: plan.color }]}>
-                    <Ionicons name="checkmark" size={11} color="#fff" />
-                    <Text style={s.currentBadgeTxt}>{t('sub_current_badge')}</Text>
-                  </View>
-                )}
 
-                <View style={s.planCardTop}>
-                  <View style={[s.planCardIcon, { backgroundColor: plan.bg }]}>
-                    <Ionicons name={plan.icon} size={22} color={plan.color} />
-                  </View>
-                  <View style={{ flex: 1 }}>
+                {/* Başlık satırı */}
+                <View style={s.planCardHeader}>
+                  <View style={s.planCardHeaderLeft}>
+                    <View style={[s.planCardIcon, { backgroundColor: plan.bg }]}>
+                      <Ionicons name={plan.icon} size={18} color={plan.color} />
+                    </View>
                     <Text style={s.planCardName}>{t(plan.labelKey)}</Text>
-                    <Text style={[s.planCardPrice, { color: plan.color }]}>
-                      {planPrice(plan.key)}<Text style={s.planCardPer}>{t('sub_per_month')}</Text>
-                    </Text>
                   </View>
+                  {isCurrent ? (
+                    <View style={[s.badgePill, { backgroundColor: plan.color + '18', borderColor: plan.color + '40' }]}>
+                      <Ionicons name="checkmark" size={10} color={plan.color} />
+                      <Text style={[s.badgePillTxt, { color: plan.color }]}>{t('sub_current_badge')}</Text>
+                    </View>
+                  ) : plan.popular ? (
+                    <View style={[s.badgePill, { backgroundColor: plan.color + '18', borderColor: plan.color + '40' }]}>
+                      <Text style={[s.badgePillTxt, { color: plan.color }]}>{t('sub_popular_badge')}</Text>
+                    </View>
+                  ) : null}
                 </View>
 
-                <View style={s.featureList}>
-                  {plan.featureKeys.map(fk => (
-                    <View key={fk} style={s.featureRow}>
-                      <Ionicons name="checkmark-circle" size={15} color={plan.color} />
-                      <Text style={s.featureTxt}>{t(fk)}</Text>
-                    </View>
-                  ))}
-                  {profile?.isTurkish && (
-                    <View style={s.featureRow}>
-                      <Ionicons name="chatbubble-ellipses" size={15} color={plan.color} />
-                      <Text style={s.featureTxt}>{t(plan.smsKey)}</Text>
-                    </View>
-                  )}
-                  {plan.missingKeys.map(fk => (
-                    <View key={fk} style={s.featureRow}>
-                      <Ionicons name="close-circle-outline" size={15} color="#D1D5DB" />
-                      <Text style={[s.featureTxt, s.missingTxt]}>{t(fk)}</Text>
-                    </View>
-                  ))}
+                {/* Fiyat */}
+                <View style={s.priceRow}>
+                  <Text style={s.priceMain}>{priceStr}</Text>
+                  <Text style={s.pricePer}>{t('sub_per_month')}</Text>
                 </View>
 
-                {!isCurrent && (
+                {/* CTA butonu */}
+                {isCurrent ? (
+                  <View style={[s.planBtn, { backgroundColor: plan.color + '12' }]}>
+                    <Ionicons name="checkmark-circle" size={16} color={plan.color} />
+                    <Text style={[s.planBtnTxt, { color: plan.color }]}>{t('sub_current_badge')}</Text>
+                  </View>
+                ) : (
                   <TouchableOpacity
-                    style={[s.planBtn, { backgroundColor: isDowngrade ? '#F9FAFB' : plan.color }, purchasing === plan.key && { opacity: 0.7 }]}
+                    style={[s.planBtn, { backgroundColor: isDowngrade ? '#F3F4F6' : plan.color }, purchasing === plan.key && { opacity: 0.7 }]}
                     onPress={() => handleUpgrade(plan.key)}
                     disabled={!!purchasing}
                     activeOpacity={0.85}
                   >
                     {purchasing === plan.key
                       ? <ActivityIndicator color={isDowngrade ? '#6B7280' : '#fff'} size="small" />
-                      : <Text style={[s.planBtnTxt, isDowngrade && { color: '#6B7280' }]}>
+                      : <Text style={[s.planBtnTxt, { color: isDowngrade ? '#6B7280' : '#fff' }]}>
                           {isDowngrade ? t('sub_downgrade_btn') : t('sub_upgrade_btn')}
                         </Text>
                     }
                   </TouchableOpacity>
+                )}
+
+                {/* Dahil özellikler */}
+                <View style={s.dividerRow}>
+                  <View style={s.dividerLine} />
+                  <Text style={s.dividerTxt}>{t('sub_features_included')}</Text>
+                  <View style={s.dividerLine} />
+                </View>
+
+                <View style={s.featureList}>
+                  {plan.featureKeys.map(fk => (
+                    <View key={fk} style={s.featureRow}>
+                      <Ionicons name="checkmark-circle" size={17} color="#22C55E" />
+                      <Text style={s.featureTxt}>{t(fk)}</Text>
+                    </View>
+                  ))}
+                  {profile?.isTurkish && (
+                    <View style={s.featureRow}>
+                      <Ionicons name="checkmark-circle" size={17} color="#22C55E" />
+                      <Text style={s.featureTxt}>{t(plan.smsKey)}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Eksik özellikler */}
+                {plan.missingKeys.length > 0 && (
+                  <>
+                    <View style={s.dividerRow}>
+                      <View style={s.dividerLine} />
+                      <Text style={s.dividerTxt}>{t('sub_features_missing')}</Text>
+                      <View style={s.dividerLine} />
+                    </View>
+                    <View style={s.featureList}>
+                      {plan.missingKeys.map(fk => (
+                        <View key={fk} style={s.featureRow}>
+                          <Ionicons name="close-circle" size={17} color="#F87171" />
+                          <Text style={s.missingTxt}>{t(fk)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </>
                 )}
               </View>
             )
@@ -348,14 +378,14 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F4F4F8' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 80 },
 
-  hero: { paddingBottom: 32, paddingHorizontal: 20, overflow: 'hidden' },
+  hero: { paddingBottom: 16, paddingHorizontal: 20, overflow: 'hidden' },
   decoCircle1: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(0,0,0,0.1)', top: -70, right: -60 },
   decoCircle2: { position: 'absolute', width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.07)', bottom: -20, left: 30 },
   backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   heroContent: { alignItems: 'center' },
-  planIconWrap: { width: 64, height: 64, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
-  heroTitle: { fontSize: 32, fontWeight: '900', color: '#fff', marginBottom: 10 },
+  planIconWrap: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
+  heroLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 },
+  heroTitle: { fontSize: 20, fontWeight: '900', color: '#fff', marginBottom: 6 },
   daysLeftBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   daysLeftTxt: { fontSize: 12, color: '#fff', fontWeight: '700' },
   heroCurve: { height: 24, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
@@ -376,23 +406,28 @@ const s = StyleSheet.create({
   sectionTitle2: { fontSize: 13, fontWeight: '700', color: '#374151', marginHorizontal: 16, marginTop: 20, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   planCard: { backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: 18, padding: 18, borderWidth: 1.5, borderColor: '#F3F4F6', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-  popularBadge: { position: 'absolute', top: -1, right: 20, paddingHorizontal: 10, paddingVertical: 4, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 },
-  popularTxt: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  currentBadge: { position: 'absolute', top: -1, right: 20, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 10, paddingVertical: 4, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 },
-  currentBadgeTxt: { color: '#fff', fontSize: 10, fontWeight: '800' },
 
-  planCardTop: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
-  planCardIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  planCardName: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 2 },
-  planCardPrice: { fontSize: 22, fontWeight: '900' },
-  planCardPer: { fontSize: 13, fontWeight: '500', color: '#9CA3AF' },
+  planCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  planCardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  planCardIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  planCardName: { fontSize: 16, fontWeight: '800', color: '#111827' },
+  badgePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  badgePillTxt: { fontSize: 11, fontWeight: '700' },
 
-  featureList: { gap: 8, marginBottom: 16 },
+  priceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginBottom: 14 },
+  priceMain: { fontSize: 28, fontWeight: '900', color: '#111827' },
+  pricePer: { fontSize: 13, color: '#9CA3AF', fontWeight: '500', marginBottom: 3 },
+
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, marginTop: 4 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#F3F4F6' },
+  dividerTxt: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  featureList: { gap: 8, marginBottom: 14 },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   featureTxt: { fontSize: 13, color: '#374151', fontWeight: '500' },
   missingTxt: { color: '#D1D5DB' },
 
-  planBtn: { padding: 14, borderRadius: 12, alignItems: 'center' },
+  planBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14, borderRadius: 12, marginBottom: 14 },
   planBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   supportCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#EDE9FE', marginHorizontal: 16, marginTop: 4, borderRadius: 18, padding: 16 },

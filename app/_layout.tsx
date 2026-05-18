@@ -80,7 +80,9 @@ export default function RootLayout() {
         try {
           const { status } = await Notifications.requestPermissionsAsync();
           if (status === 'granted') {
-            const tokenData = await Notifications.getExpoPushTokenAsync();
+            const tokenData = await Notifications.getExpoPushTokenAsync({
+              projectId: '95e15bc2-b5de-4a43-a884-7055e320b629',
+            });
             await api.pushToken.register(tokenData.data);
             await scheduleTips();
           }
@@ -95,7 +97,9 @@ export default function RootLayout() {
         try {
           const { status } = await Notifications.requestPermissionsAsync()
           if (status === 'granted') {
-            const tokenData = await Notifications.getExpoPushTokenAsync()
+            const tokenData = await Notifications.getExpoPushTokenAsync({
+              projectId: '95e15bc2-b5de-4a43-a884-7055e320b629',
+            })
             await api.pushToken.registerStaff(tokenData.data)
           }
         } catch (e) {
