@@ -57,14 +57,25 @@ async function _detect(): Promise<string> {
     }
   } catch { /* ignore */ }
 
-  // 3. IP tespiti (fallback)
+  // 3. Cihaz locale'inden ülke tespiti
+  try {
+    const { getLocales } = await import('expo-localization')
+    const locales = getLocales()
+    const region = locales[0]?.regionCode
+    if (region && (PRICING[region] || region === 'TR')) {
+      _cachedCountry = region
+      return _cachedCountry
+    }
+  } catch { /* ignore */ }
+
+  // 4. IP tespiti (fallback)
   try {
     const res = await axios.get('https://ipapi.co/json/', { timeout: 4000 });
-    const code = res.data.country_code || 'US'
+    const code = res.data.country_code || 'TR'
     _cachedCountry = PRICING[code] ? code : 'US'
     return _cachedCountry
   } catch {
-    _cachedCountry = 'US'
+    _cachedCountry = 'TR'
     return _cachedCountry
   }
 }
