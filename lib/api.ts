@@ -21,10 +21,36 @@ async function getHeaders(): Promise<Record<string, string>> {
 
   // Staff oturumu: mobile_token (gerçek JWT) kullan, Supabase session'a gerek yok
   if (staffToken) {
-    if (mobileToken) {
-      headers['x-mobile-token'] = mobileToken
-      headers['Authorization'] = `Bearer ${mobileToken}`
-      if (__DEV__) console.log('[api:getHeaders] staff session: using mobile_token as Bearer')
+    let activeToken = mobileToken
+    // Token süresi dolduysa refresh_token ile yenile
+    if (activeToken) {
+      try {
+        const payload = JSON.parse(atob(activeToken.split('.')[1]))
+        const expiring = payload.exp * 1000 < Date.now() + 60_000
+        if (expiring) {
+          const refreshToken = await secureStorage.getItem('refresh_token')
+          if (refreshToken) {
+            const { createClient: createSB } = await import('@supabase/supabase-js')
+            const sb = createSB(
+              process.env.EXPO_PUBLIC_SUPABASE_URL!,
+              process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+              { auth: { autoRefreshToken: false, persistSession: false } }
+            )
+            const { data } = await sb.auth.refreshSession({ refresh_token: refreshToken })
+            if (data.session?.access_token) {
+              activeToken = data.session.access_token
+              await secureStorage.setItem('mobile_token', activeToken)
+              if (data.session.refresh_token) {
+                await secureStorage.setItem('refresh_token', data.session.refresh_token)
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+    if (activeToken) {
+      headers['x-mobile-token'] = activeToken
+      headers['Authorization'] = `Bearer ${activeToken}`
     }
     return headers
   }
