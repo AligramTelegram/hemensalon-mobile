@@ -99,19 +99,32 @@ function withTimeout(signal?: AbortSignal): AbortSignal {
   return controller.signal
 }
 
-async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
+const _cache = new Map<string, { data: unknown; at: number }>()
+const CACHE_TTL = 30_000 // 30 saniye
+
+export function invalidateCache(prefix?: string) {
+  if (!prefix) { _cache.clear(); return }
+  for (const k of _cache.keys()) { if (k.startsWith(prefix)) _cache.delete(k) }
+}
+
+async function get<T>(path: string, params?: Record<string, string>, ttl = CACHE_TTL): Promise<T> {
   const url = new URL(path, BASE)
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
+  const cacheKey = url.toString()
+  const cached = _cache.get(cacheKey)
+  if (cached && Date.now() - cached.at < ttl) return cached.data as T
   const res = await fetch(url.toString(), { headers: await getHeaders(), signal: withTimeout() })
   const data = await res.json().catch(() => null)
   if (!res.ok) {
     console.warn(`API GET failed: ${url.toString()}`, res.status, data)
     throw new Error(data?.error ?? `GET ${path} → ${res.status}`)
   }
+  _cache.set(cacheKey, { data, at: Date.now() })
   return data
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
+  invalidateCache(new URL(path, BASE).pathname.split('/').slice(0, 4).join('/'))
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: await getHeaders(),
