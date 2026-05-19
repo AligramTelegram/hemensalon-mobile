@@ -16,7 +16,7 @@
     "production": {
       "autoIncrement": true,
       "android": { "buildType": "app-bundle" },
-      "ios": {}
+      "ios": { "image": "latest" }
     }
   },
   "submit": {
