@@ -31,7 +31,7 @@
       },
       "googleServicesFile": "./google-services.json",
       "package": "com.appointly.app",
-      "versionCode": 18,
+      "versionCode": 20,
       "minSdkVersion": 29,
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -61,7 +61,6 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "@sentry/react-native",
       [
         "expo-build-properties",
         {
