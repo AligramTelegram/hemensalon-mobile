@@ -1,7 +1,8 @@
 import { useRef, useEffect, useCallback } from 'react'
-import { Platform, View, Animated, StyleSheet, Pressable, Dimensions } from 'react-native'
+import { Platform, View, Animated, StyleSheet, Pressable } from 'react-native'
 import { useRouter, usePathname, useSegments } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
@@ -23,7 +24,6 @@ const TAB_DEFS: TabConfig[] = [
   { name: 'menu',         route: '/(tabs)/menu',         icon: 'grid',          iconOutline: 'grid-outline',         color: '#EA580C' },
 ]
 
-// (tabs) dışındaki dock'un göründüğü root stack ekranlar
 const DOCK_VISIBLE_SCREENS = [
   'calisanlar', 'hizmetler', 'finans',
   'ayarlar', 'raporlar', 'stok', 'paketler',
@@ -34,54 +34,50 @@ const DOCK_VISIBLE_SCREENS = [
 function DockItem({ tab, focused, onPress }: { tab: TabConfig; focused: boolean; onPress: () => void }) {
   const scale      = useRef(new Animated.Value(1)).current
   const translateY = useRef(new Animated.Value(0)).current
-  const dotOpacity = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(scale,      { toValue: focused ? 1.15 : 1, useNativeDriver: true, tension: 300, friction: 14 }),
-      Animated.spring(translateY, { toValue: focused ? -3 : 0,   useNativeDriver: true, tension: 300, friction: 14 }),
-      Animated.timing(dotOpacity, { toValue: focused ? 1 : 0,    duration: 200, useNativeDriver: true }),
+      Animated.spring(scale,      { toValue: focused ? 1.18 : 1, useNativeDriver: true, tension: 300, friction: 14 }),
+      Animated.spring(translateY, { toValue: focused ? -4 : 0,   useNativeDriver: true, tension: 300, friction: 14 }),
     ]).start()
   }, [focused])
 
   const handlePressIn = useCallback(() => {
-    Animated.spring(scale, { toValue: 0.85, useNativeDriver: true, tension: 400, friction: 10 }).start()
+    Animated.spring(scale, { toValue: 0.82, useNativeDriver: true, tension: 400, friction: 10 }).start()
   }, [])
 
   const handlePressOut = useCallback(() => {
     Animated.sequence([
-      Animated.spring(scale, { toValue: focused ? 1.22 : 1.08, useNativeDriver: true, tension: 400, friction: 6 }),
-      Animated.spring(scale, { toValue: focused ? 1.15 : 1,    useNativeDriver: true, tension: 300, friction: 14 }),
+      Animated.spring(scale, { toValue: focused ? 1.28 : 1.12, useNativeDriver: true, tension: 400, friction: 6 }),
+      Animated.spring(scale, { toValue: focused ? 1.18 : 1,    useNativeDriver: true, tension: 300, friction: 14 }),
     ]).start()
   }, [focused])
 
   return (
     <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={s.item}>
       <Animated.View style={[s.itemInner, { transform: [{ scale }, { translateY }] }]}>
-        <View style={[s.iconWrap, focused && { backgroundColor: tab.color + '18' }]}>
+        <View style={[s.iconWrap, focused && { backgroundColor: tab.color + '20' }]}>
           <Ionicons
             name={focused ? tab.icon : tab.iconOutline}
-            size={26}
-            color={focused ? tab.color : '#B0B0BE'}
+            size={24}
+            color={focused ? tab.color : '#9CA3AF'}
           />
         </View>
-        <Animated.View style={[s.dot, { backgroundColor: tab.color, opacity: dotOpacity }]} />
+        {focused && <View style={[s.dot, { backgroundColor: tab.color }]} />}
       </Animated.View>
     </Pressable>
   )
 }
 
 export function FloatingDock() {
-  const router = useRouter()
+  const router   = useRouter()
   const pathname = usePathname()
   const segments = useSegments()
+  const insets   = useSafeAreaInsets()
 
-  const seg0 = segments[0] ?? ''
-  const hidden = seg0 === '(auth)' || seg0 === '(staff)' || seg0 === 'deneme-bitti' || seg0 === ''
-  const visible = !hidden && (
-    seg0 === '(tabs)' ||
-    DOCK_VISIBLE_SCREENS.includes(seg0)
-  )
+  const seg0    = segments[0] ?? ''
+  const hidden  = seg0 === '(auth)' || seg0 === '(staff)' || seg0 === 'deneme-bitti' || seg0 === ''
+  const visible = !hidden && (seg0 === '(tabs)' || DOCK_VISIBLE_SCREENS.includes(seg0))
 
   if (!visible) return null
 
@@ -90,9 +86,11 @@ export function FloatingDock() {
     return pathname.includes(tab.name)
   }
 
+  const bottomOffset = insets.bottom + 12
+
   return (
-    <View style={s.wrapper}>
-      <BlurView intensity={70} tint="light" style={s.blur}>
+    <View style={[s.wrapper, { bottom: bottomOffset }]} pointerEvents="box-none">
+      <BlurView intensity={80} tint="light" style={s.blur}>
         <View style={s.inner}>
           {TAB_DEFS.map(tab => (
             <DockItem
@@ -108,29 +106,32 @@ export function FloatingDock() {
   )
 }
 
-const BOTTOM_PAD = Platform.OS === 'ios' ? 28 : 0
-
 const s = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    left: 20,
+    right: 20,
     zIndex: 100,
-    pointerEvents: 'box-none',
+    borderRadius: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 20,
   },
   blur: {
+    borderRadius: 28,
     overflow: 'hidden',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
   },
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: BOTTOM_PAD + 10,
+    paddingVertical: 10,
     paddingHorizontal: 8,
-    backgroundColor: 'rgba(255,255,255,0.82)',
+    backgroundColor: Platform.OS === 'android' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.75)',
+    borderRadius: 28,
   },
   item: {
     flex: 1,
@@ -142,15 +143,15 @@ const s = StyleSheet.create({
     gap: 4,
   },
   iconWrap: {
-    width: 52,
-    height: 46,
+    width: 48,
+    height: 44,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
 })

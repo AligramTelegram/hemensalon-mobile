@@ -11,7 +11,8 @@ import * as Notifications from 'expo-notifications';
 import { api, getCachedTenant, setCachedTenant } from '@/lib/api';
 import { initPurchases } from '@/lib/purchases';
 import type { Session } from '@supabase/supabase-js';
-import { ThemeProvider } from '@/lib/theme';
+import { ThemeProvider } from '@/lib/theme'
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { secureStorage } from '@/lib/secureStorage';
 import { scheduleTips } from '@/lib/scheduleTips';
@@ -244,6 +245,7 @@ export default function RootLayout() {
   }
 
   return (
+    <SafeAreaProvider>
     <ThemeProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)/login" />
@@ -270,5 +272,6 @@ export default function RootLayout() {
       <FloatingDock />
       {!splashDone && <SplashAnimation onFinish={() => setSplashDone(true)} />}
     </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
