@@ -31,7 +31,7 @@
       },
       "googleServicesFile": "./google-services.json",
       "package": "com.appointly.app",
-      "versionCode": 16,
+      "versionCode": 18,
       "minSdkVersion": 29,
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -60,7 +60,17 @@
           "sounds": []
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "@sentry/react-native",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": false
+          }
+        }
+      ],
+      "expo-build-properties"
     ],
     "scheme": "hemensalon",
     "extra": {

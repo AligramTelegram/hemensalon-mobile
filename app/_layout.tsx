@@ -41,6 +41,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     async function setup() {
+      try {
       const country = await detectCountry();
       await initI18n(country);
       I18nManager.forceRTL(isRTL());
@@ -108,6 +109,11 @@ export default function RootLayout() {
       }
 
       setReady(true);
+      } catch (e) {
+        console.error('[setup] FATAL:', e)
+        // Crash yerine yine de devam et
+        setReady(true);
+      }
     }
     setup();
 
