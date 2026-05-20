@@ -4,6 +4,7 @@ workflows:
     max_build_duration: 60
     environment:
       node: 20.17.0
+      java: 17
       groups:
         - andriod
       android_signing:
@@ -11,9 +12,15 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm install
+      - name: Install EAS CLI
+        script: npm install -g eas-cli
       - name: Build Android
         script: |
-          npx eas build --platform android --profile production --non-interactive --local --output app-release.aab
+          export ANDROID_HOME=$HOME/Library/Android/sdk
+          export PATH=$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools
+          echo "EXPO_TOKEN set: ${EXPO_TOKEN:+yes}"
+          echo "ANDROID_HOME: $ANDROID_HOME"
+          eas build --platform android --profile production --non-interactive --local --output app-release.aab
     artifacts:
       - app-release.aab
     publishing:
