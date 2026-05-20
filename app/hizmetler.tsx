@@ -2,7 +2,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, ActivityIndicator, ScrollView, Platform } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
+import { useDockPad } from '@/lib/useDockPad'
+import { usePreferences } from '@/lib/usePreferences'
 import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { api, Service } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
 
@@ -18,6 +21,8 @@ function durationLabel(min: number, t: (k: string, o?: any) => string) {
 export default function Hizmetler() {
   const { t } = useTranslation()
   const headerPad = useHeaderPad()
+  const dockPad = useDockPad()
+  const { currencySymbol } = usePreferences()
   const router = useRouter()
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
@@ -68,8 +73,12 @@ export default function Hizmetler() {
         await api.services.create(body)
         load()
       }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowSvcModal(false)
-    } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed')) }
+    } catch (e: unknown) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
+    }
     setSavingSvc(false)
   }
 
@@ -115,7 +124,7 @@ export default function Hizmetler() {
         <FlatList
           data={services}
           keyExtractor={i => i.id}
-          contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: 12, paddingBottom: dockPad }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}
           ListEmptyComponent={<Text style={s.empty}>{t('hizmetler_empty')}</Text>}
           renderItem={({ item }) => (
@@ -131,7 +140,7 @@ export default function Hizmetler() {
                         <Text style={s.metaChipTxt}>{durationLabel(item.duration, t)}</Text>
                       </View>
                       <View style={[s.metaChipWrap, { backgroundColor: '#ECFDF5' }]}>
-                        <Text style={[s.metaChipTxt, { color: '#059669' }]}>₺{item.price.toLocaleString()}</Text>
+                        <Text style={[s.metaChipTxt, { color: '#059669' }]}>{currencySymbol}{item.price.toLocaleString()}</Text>
                       </View>
                     </View>
                   </View>
@@ -167,7 +176,7 @@ export default function Hizmetler() {
             <FField label={t('description')} value={svcForm.description} onChange={v => setSvcForm(f => ({ ...f, description: v }))} placeholder={t('optional')} />
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}><FField label={`${t('duration_min')} *`} value={svcForm.duration} onChange={v => setSvcForm(f => ({ ...f, duration: v }))} placeholder="60" keyboardType="numeric" /></View>
-              <View style={{ flex: 1 }}><FField label={`${t('price')} (₺) *`} value={svcForm.price} onChange={v => setSvcForm(f => ({ ...f, price: v }))} placeholder="200" keyboardType="numeric" /></View>
+              <View style={{ flex: 1 }}><FField label={`${t('price')} (${currencySymbol}) *`} value={svcForm.price} onChange={v => setSvcForm(f => ({ ...f, price: v }))} placeholder="200" keyboardType="numeric" /></View>
             </View>
             <Text style={s.fieldLabel}>{t('color')}</Text>
             <View style={s.colorGrid}>
@@ -181,7 +190,7 @@ export default function Hizmetler() {
             <TouchableOpacity style={s.saveBtn} onPress={handleSaveSvc} disabled={savingSvc}>
               {savingSvc ? <ActivityIndicator color="#fff" /> : <Text style={s.saveTxt}>{editingSvc ? t('update') : t('hizmet_add')}</Text>}
             </TouchableOpacity>
-            <View style={{ height: 40 }} />
+            <View style={{ height: dockPad }} />
           </ScrollView>
         </View>
       </Modal>

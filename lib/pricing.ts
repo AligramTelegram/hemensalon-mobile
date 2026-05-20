@@ -11,11 +11,11 @@ interface PricingData {
 }
 
 const PRICING: Record<string, PricingData> = {
-  TR: { country: 'TR', currency: 'TRY', symbol: '₺', starter: 540, professional: 1140, business: 1740 },
-  US: { country: 'US', currency: 'USD', symbol: '$', starter: 19, professional: 39, business: 59 },
-  DE: { country: 'DE', currency: 'EUR', symbol: '€', starter: 17, professional: 35, business: 54 },
-  AE: { country: 'AE', currency: 'AED', symbol: 'د.إ', starter: 70, professional: 145, business: 219 },
-  GB: { country: 'GB', currency: 'GBP', symbol: '£', starter: 15, professional: 31, business: 47 },
+  TR: { country: 'TR', currency: 'TRY', symbol: '₺', starter: 599, professional: 1299, business: 1799 },
+  US: { country: 'US', currency: 'USD', symbol: '$', starter: 16, professional: 34, business: 49 },
+  DE: { country: 'DE', currency: 'EUR', symbol: '€', starter: 15, professional: 32, business: 45 },
+  AE: { country: 'AE', currency: 'AED', symbol: 'د.إ', starter: 62, professional: 129, business: 179 },
+  GB: { country: 'GB', currency: 'GBP', symbol: '£', starter: 13, professional: 27, business: 39 },
 };
 
 const CURRENCY_TO_COUNTRY: Record<string, string> = {
@@ -72,8 +72,8 @@ async function _detect(): Promise<string> {
   try {
     const res = await axios.get('https://ipapi.co/json/', { timeout: 4000 });
     const code = res.data.country_code || 'TR'
-    _cachedCountry = PRICING[code] ? code : 'US'
-    return _cachedCountry
+    _cachedCountry = PRICING[code] ? code : 'TR'
+    return _cachedCountry!
   } catch {
     _cachedCountry = 'TR'
     return _cachedCountry

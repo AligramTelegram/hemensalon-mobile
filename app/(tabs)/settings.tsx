@@ -1,23 +1,21 @@
 import { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native'
 import { supabase } from '@/lib/supabase'
-import { detectCountry, getPricing } from '@/lib/pricing'
+import { getPricing } from '@/lib/pricing'
+import { usePreferences } from '@/lib/usePreferences'
 import { useTranslation } from 'react-i18next'
 
 export default function Settings() {
   const { t } = useTranslation()
-  const [pricing, setPricing] = useState({ symbol: '₺', starter: 540, professional: 1140, business: 1740 })
+  const { currency, currencySymbol } = usePreferences()
+  const pricing = { ...getPricing(currency === 'TRY' ? 'TR' : currency === 'USD' ? 'US' : currency === 'EUR' ? 'DE' : currency === 'GBP' ? 'GB' : 'TR'), symbol: currencySymbol }
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
     async function load() {
-      const [country, { data: { user } }] = await Promise.all([
-        detectCountry(),
-        supabase.auth.getUser(),
-      ])
-      setPricing(getPricing(country))
+      const { data: { user } } = await supabase.auth.getUser()
       setEmail(user?.email ?? '')
       setLoading(false)
     }

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, A
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { api, Staff, PlanLimitError } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
 import { usePlanFeatures } from '@/lib/usePlanFeatures'
@@ -81,8 +82,10 @@ export default function Calisanlar() {
         await api.staff.create(body)
         load()
       }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
     } catch (e: unknown) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       if (e instanceof PlanLimitError) {
         Alert.alert(
           t('staff_limit_alert_title'),

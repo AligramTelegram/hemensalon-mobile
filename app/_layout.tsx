@@ -21,6 +21,17 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true, shouldShowBanner: true, shouldShowList: true }),
 });
 
+if (typeof navigator !== 'undefined') {
+  // Android bildirim kanalı — ses için zorunlu
+  Notifications.setNotificationChannelAsync('default', {
+    name: 'Bildirimler',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default',
+    vibrationPattern: [0, 250, 250, 250],
+    enableVibrate: true,
+  }).catch(() => {})
+}
+
 export const PUSH_NOTIFS_KEY = 'push_notifications_log'
 
 export interface StoredPushNotif {
@@ -40,12 +51,27 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
 
+  // İlk kurulumda bildirim izni iste
+  useEffect(() => {
+    AsyncStorage.getItem('notif_permission_asked').then(asked => {
+      if (!asked) {
+        Notifications.requestPermissionsAsync().then(() => {
+          AsyncStorage.setItem('notif_permission_asked', '1')
+        }).catch(() => {})
+      }
+    })
+  }, [])
+
   useEffect(() => {
     async function setup() {
       try {
       const country = await detectCountry();
       await initI18n(country);
-      I18nManager.forceRTL(isRTL());
+      // RTL sadece değiştiğinde uygula — her açılışta forceRTL çağırmak iOS'ta crash'e yol açar
+      const shouldBeRTL = isRTL()
+      if (I18nManager.isRTL !== shouldBeRTL) {
+        I18nManager.forceRTL(shouldBeRTL)
+      }
 
       // Oturum süresi kontrolü — JWT expiry'sine göre, yoksa 24h fallback
       const expiresAtStr = await secureStorage.getItem('session_expires_at')
@@ -120,6 +146,10 @@ export default function RootLayout() {
 
     // Gelen push bildirimlerini AsyncStorage'a kaydet
     const notifSub = Notifications.addNotificationReceivedListener(async (notif) => {
+      try {
+        const { impactAsync, ImpactFeedbackStyle } = await import('expo-haptics')
+        impactAsync(ImpactFeedbackStyle.Medium).catch(() => {})
+      } catch {}
       try {
         const raw = await AsyncStorage.getItem(PUSH_NOTIFS_KEY)
         const list: StoredPushNotif[] = raw ? JSON.parse(raw) : []

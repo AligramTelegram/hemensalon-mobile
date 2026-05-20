@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
+import { usePreferences } from '@/lib/usePreferences'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, Package, Service } from '@/lib/api'
@@ -17,6 +18,7 @@ export default function Paketler() {
   const { t } = useTranslation()
   const planFeatures = usePlanFeatures()
   const headerPad = useHeaderPad()
+  const { currencySymbol } = usePreferences()
   const router = useRouter()
   const [packages, setPackages] = useState<Package[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -195,7 +197,7 @@ export default function Paketler() {
                       {item.description ? <Text style={s.cardDesc}>{item.description}</Text> : null}
                     </View>
                     <View style={s.priceCol}>
-                      <Text style={s.priceMain}>₺{item.price}</Text>
+                      <Text style={s.priceMain}>{currencySymbol}{item.price}</Text>
                       <Text style={s.priceSub}>{t('packages_per_session', { price: perSession })}</Text>
                     </View>
                   </View>

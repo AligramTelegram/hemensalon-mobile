@@ -5,11 +5,11 @@ import {
   ScrollView, Platform, Animated, PanResponder,
 } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
+import { usePreferences } from '@/lib/usePreferences'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, Appointment, Customer, Service, Staff, WaitingEntry } from '@/lib/api'
-import { detectCountry, getPricing } from '@/lib/pricing'
 import { useTranslation } from 'react-i18next'
 
 const STATUS_COLOR: Record<string, string> = {
@@ -42,11 +42,11 @@ export default function Appointments() {
   const { t } = useTranslation()
   const router = useRouter()
   const headerPad = useHeaderPad()
+  const { currencySymbol: symbol } = usePreferences()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [staffList, setStaffList] = useState<Staff[]>([])
-  const [symbol, setSymbol] = useState('₺')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [filterDate, setFilterDate] = useState(todayISO())
@@ -76,9 +76,8 @@ export default function Appointments() {
 
   const load = useCallback(async (date = filterDate) => {
     try {
-      const [apts, country] = await Promise.all([api.appointments.list({ date }), detectCountry()])
+      const apts = await api.appointments.list({ date })
       setAppointments(apts)
-      setSymbol(getPricing(country).symbol)
     } catch {}
     setLoading(false)
     setRefreshing(false)

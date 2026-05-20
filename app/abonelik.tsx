@@ -71,7 +71,7 @@ export default function Abonelik() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [symbol, setSymbol] = useState('₺')
-  const [prices, setPrices] = useState({ starter: 540, professional: 1140, business: 1740 })
+  const [prices, setPrices] = useState({ starter: 599.99, professional: 1299.99, business: 1799.99 })
   const [packages, setPackages] = useState<PurchasesPackage[]>([])
   const [purchasing, setPurchasing] = useState<string | null>(null)
   const [restoring, setRestoring] = useState(false)

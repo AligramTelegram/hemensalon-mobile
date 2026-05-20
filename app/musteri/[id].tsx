@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
+import { usePreferences } from '@/lib/usePreferences'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, Customer, CustomerNote, CustomerPackage, Package } from '@/lib/api'
@@ -38,6 +39,7 @@ function getTagKey(c: { totalVisits: number; totalSpent: number; lastVisitAt?: s
 export default function MusteriDetay() {
   const { t } = useTranslation()
   const headerPad = useHeaderPad()
+  const { currencySymbol } = usePreferences()
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
 
@@ -227,7 +229,7 @@ export default function MusteriDetay() {
         {/* İstatistikler */}
         <View style={s.statsRow}>
           <StatCard icon="calendar-outline" label={t('customer_visits')} value={String(customer.totalVisits)} color="#7C3AED" />
-          <StatCard icon="wallet-outline" label={t('customer_spent')} value={`₺${customer.totalSpent}`} color="#059669" />
+          <StatCard icon="wallet-outline" label={t('customer_spent')} value={`${currencySymbol}${customer.totalSpent}`} color="#059669" />
           <StatCard
             icon="time-outline" label={t('customer_lastVisit')}
             value={customer.lastVisitAt ? formatDate(customer.lastVisitAt) : '—'}
@@ -329,7 +331,7 @@ export default function MusteriDetay() {
                   <View style={[s.statusBadge, { backgroundColor: (STATUS_COLOR[a.status] ?? '#6B7280') + '20' }]}>
                     <Text style={[s.statusTxt, { color: STATUS_COLOR[a.status] ?? '#6B7280' }]}>{t(STATUS_LABEL_KEYS[a.status] ?? 'status_pending')}</Text>
                   </View>
-                  <Text style={s.aptPrice}>₺{a.price}</Text>
+                  <Text style={s.aptPrice}>{currencySymbol}{a.price}</Text>
                 </View>
               </View>
             ))}
@@ -421,7 +423,7 @@ export default function MusteriDetay() {
                   <Text style={s.pkgOptionName}>{pkg.name}</Text>
                   <Text style={s.pkgOptionSub}>{pkg.service.name} · {t('hizmet_sessions', { count: pkg.sessions })}</Text>
                 </View>
-                <Text style={s.pkgOptionPrice}>₺{pkg.price}</Text>
+                <Text style={s.pkgOptionPrice}>{currencySymbol}{pkg.price}</Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity style={[s.saveBtn, { marginTop: 20 }]} onPress={handleSellPackage} disabled={saving}>

@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, ActivityIndicator, ScrollView, Platform } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
+import { useDockPad } from '@/lib/useDockPad'
+import { usePreferences } from '@/lib/usePreferences'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, Transaction, Appointment, TenantProfile } from '@/lib/api'
@@ -27,6 +29,8 @@ export default function Finans() {
   const { t } = useTranslation()
   const router = useRouter()
   const headerPad = useHeaderPad()
+  const dockPad = useDockPad()
+  const { currencySymbol } = usePreferences()
   const planFeatures = usePlanFeatures()
   const [tab, setTab] = useState<Tab>('transactions')
   const [tenantProfile, setTenantProfile] = useState<TenantProfile | null>(null)
@@ -90,9 +94,13 @@ export default function Finans() {
         paymentMethod: form.paymentMethod,
         isDebt: form.isDebt,
       })
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
       load()
-    } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed')) }
+    } catch (e: unknown) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
+    }
     setSaving(false)
   }
 
@@ -243,17 +251,17 @@ export default function Finans() {
             <View style={[s.summaryCard, { backgroundColor: '#ECFDF5' }]}>
               <Ionicons name="trending-up" size={18} color="#059669" style={{ marginBottom: 6 }} />
               <Text style={s.summaryLabel}>{t('revenue')}</Text>
-              <Text style={[s.summaryVal, { color: '#059669' }]}>₺{revenue.toLocaleString()}</Text>
+              <Text style={[s.summaryVal, { color: '#059669' }]}>{currencySymbol}{revenue.toLocaleString()}</Text>
             </View>
             <View style={[s.summaryCard, { backgroundColor: '#FEF2F2' }]}>
               <Ionicons name="trending-down" size={18} color="#DC2626" style={{ marginBottom: 6 }} />
               <Text style={s.summaryLabel}>{t('expense')}</Text>
-              <Text style={[s.summaryVal, { color: '#DC2626' }]}>₺{expense.toLocaleString()}</Text>
+              <Text style={[s.summaryVal, { color: '#DC2626' }]}>{currencySymbol}{expense.toLocaleString()}</Text>
             </View>
             <View style={[s.summaryCard, { backgroundColor: net >= 0 ? '#ECFDF5' : '#FEF2F2' }]}>
               <Ionicons name="wallet-outline" size={18} color={net >= 0 ? '#059669' : '#DC2626'} style={{ marginBottom: 6 }} />
               <Text style={s.summaryLabel}>{t('netProfit')}</Text>
-              <Text style={[s.summaryVal, { color: net >= 0 ? '#059669' : '#DC2626' }]}>₺{Math.abs(net).toLocaleString()}</Text>
+              <Text style={[s.summaryVal, { color: net >= 0 ? '#059669' : '#DC2626' }]}>{currencySymbol}{Math.abs(net).toLocaleString()}</Text>
             </View>
           </View>
 
@@ -261,7 +269,7 @@ export default function Finans() {
             <FlatList
               data={transactions}
               keyExtractor={i => i.id}
-              contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
+              contentContainerStyle={{ padding: 12, paddingBottom: dockPad }}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}
               ListEmptyComponent={<Text style={s.empty}>{t('finans_empty')}</Text>}
               renderItem={({ item }) => {
@@ -291,7 +299,7 @@ export default function Finans() {
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 6 }}>
                       <Text style={[s.rowAmount, { color: item.type === 'GELIR' ? '#059669' : '#DC2626' }]}>
-                        {item.type === 'GELIR' ? '+' : '-'}₺{item.amount.toLocaleString()}
+                        {item.type === 'GELIR' ? '+' : '-'}{currencySymbol}{item.amount.toLocaleString()}
                       </Text>
                       <TouchableOpacity style={s.invoiceBtn} onPress={() => handleTransactionInvoice(item)}>
                         <Ionicons name="document-text-outline" size={12} color="#7C3AED" />
@@ -307,13 +315,13 @@ export default function Finans() {
       )}
 
       {tab === 'debts' && (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12, paddingBottom: dockPad }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}>
 
           {debts.length > 0 && (
             <View style={s.debtSummary}>
               <Text style={s.debtSummaryLabel}>{t('finans_totalDebt')}</Text>
-              <Text style={s.debtSummaryVal}>₺{totalDebt.toLocaleString()}</Text>
+              <Text style={s.debtSummaryVal}>{currencySymbol}{totalDebt.toLocaleString()}</Text>
             </View>
           )}
 
@@ -331,7 +339,7 @@ export default function Finans() {
                   <Text style={s.debtDate}>{new Date(apt.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} · {apt.startTime}</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 8 }}>
-                  <Text style={s.debtAmount}>₺{apt.price.toLocaleString()}</Text>
+                  <Text style={s.debtAmount}>{currencySymbol}{apt.price.toLocaleString()}</Text>
                   <View style={{ flexDirection: 'row', gap: 6 }}>
                     <TouchableOpacity style={s.invoiceBtn} onPress={() => handleAppointmentInvoice(apt)}>
                       <Ionicons name="document-text-outline" size={12} color="#7C3AED" />
@@ -389,7 +397,7 @@ export default function Finans() {
               ))}
             </View>
 
-            <Text style={s.fieldLabel}>{t('amount')} (₺) *</Text>
+            <Text style={s.fieldLabel}>{t('amount')} ({currencySymbol}) *</Text>
             <TextInput style={s.input} value={form.amount} onChangeText={v => setForm(f => ({ ...f, amount: v }))} keyboardType="numeric" placeholder="0.00" placeholderTextColor="#9CA3AF" />
 
             <Text style={[s.fieldLabel, { marginTop: 14 }]}>{t('description')}</Text>

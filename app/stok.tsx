@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
+import { usePreferences } from '@/lib/usePreferences'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, Product, StockMovement } from '@/lib/api'
@@ -33,6 +34,7 @@ const UNIT_ENTRIES: { value: string; labelKey: string }[] = [
 export default function Stok() {
   const { t } = useTranslation()
   const headerPad = useHeaderPad()
+  const { currencySymbol } = usePreferences()
   const router = useRouter()
   const planFeatures = usePlanFeatures()
   const [products, setProducts] = useState<Product[]>([])
@@ -106,8 +108,12 @@ export default function Stok() {
         await api.products.create(payload)
         load()
       }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowNew(false)
-    } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed')) }
+    } catch (e: unknown) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
+    }
     setSaving(false)
   }
 
@@ -197,7 +203,7 @@ export default function Stok() {
                     </View>
                     <View style={s.rowRight}>
                       <Text style={[s.rowQty, low && { color: '#EF4444' }]}>{item.quantity} {item.unit}</Text>
-                      {item.sellPrice && <Text style={s.rowPrice}>₺{item.sellPrice}</Text>}
+                      {item.sellPrice && <Text style={s.rowPrice}>{currencySymbol}{item.sellPrice}</Text>}
                     </View>
                   </View>
                   <View style={s.rowActions}>

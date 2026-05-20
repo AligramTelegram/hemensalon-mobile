@@ -12,6 +12,8 @@ import { api, TenantProfile, WorkingHour, ReminderSettings } from '@/lib/api'
 import { useTheme } from '@/lib/theme'
 import { useTranslation } from 'react-i18next'
 import { changeLanguage, LANGUAGE_OPTIONS } from '@/lib/i18n'
+import { savePreferences } from '@/lib/usePreferences'
+import { useDockPad } from '@/lib/useDockPad'
 
 const CURRENCIES = [
   { code: 'TRY', symbol: '₺', labelKey: 'currency_try' },
@@ -61,6 +63,7 @@ const DEFAULT_HOURS: WorkingHour[] = [0, 1, 2, 3, 4, 5, 6].map(d => ({
 export default function Ayarlar() {
   const { t } = useTranslation()
   const headerPad = useHeaderPad()
+  const dockPad = useDockPad()
   const router = useRouter()
   useTheme() // ileride dark mode için
   const [profile, setProfile] = useState<TenantProfile | null>(null)
@@ -71,6 +74,11 @@ export default function Ayarlar() {
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', sector: 'HAIR' })
   const [saving, setSaving] = useState(false)
   const [showSectorPicker, setShowSectorPicker] = useState(false)
+
+  // Fatura bilgileri
+  const [showBilling, setShowBilling] = useState(false)
+  const [billing, setBilling] = useState({ ownerName: '', ownerPhone: '', ownerEmail: '', ownerIdNumber: '', ownerAddress: '', ownerCity: '', taxNumber: '', taxOffice: '' })
+  const [savingBilling, setSavingBilling] = useState(false)
 
   // Yerel tercihler
   const [currency, setCurrency] = useState('TRY')
@@ -100,6 +108,7 @@ export default function Ayarlar() {
       ])
       setProfile(p)
       setForm({ name: p.name, phone: p.phone ?? '', email: p.email ?? '', address: p.address ?? '', sector: p.sector ?? 'HAIR' })
+      setBilling({ ownerName: p.ownerName ?? '', ownerPhone: p.ownerPhone ?? '', ownerEmail: p.ownerEmail ?? '', ownerIdNumber: p.ownerIdNumber ?? '', ownerAddress: p.ownerAddress ?? '', ownerCity: p.ownerCity ?? '', taxNumber: p.taxNumber ?? '', taxOffice: p.taxOffice ?? '' })
       if (wh.length > 0) setHours(wh)
       if (cur) setCurrency(cur)
       if (lang) setLanguage(lang)
@@ -115,17 +124,34 @@ export default function Ayarlar() {
 
   useEffect(() => { load() }, [load])
 
+  async function handleSaveBilling() {
+    setSavingBilling(true)
+    try {
+      await api.tenant.update({
+        ownerName: billing.ownerName || undefined,
+        ownerPhone: billing.ownerPhone || undefined,
+        ownerEmail: billing.ownerEmail || undefined,
+        ownerIdNumber: billing.ownerIdNumber || undefined,
+        ownerAddress: billing.ownerAddress || undefined,
+        ownerCity: billing.ownerCity || undefined,
+        taxNumber: billing.taxNumber || undefined,
+        taxOffice: billing.taxOffice || undefined,
+      })
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      Alert.alert(t('success'), t('settings_saved'))
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      Alert.alert(t('error'), t('err_updateFailed'))
+    }
+    setSavingBilling(false)
+  }
+
   async function handleSavePrefs() {
     try {
-      await Promise.all([
-        AsyncStorage.setItem('pref_currency', currency),
-        AsyncStorage.setItem('pref_language', language),
-        AsyncStorage.setItem('pref_timezone', timezone),
-      ])
+      await savePreferences({ currency, language, timezone })
       await changeLanguage(language)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       Alert.alert(t('success'), t('settings_saved'))
-      Alert.alert(t('settings_languageChange'), t('settings_languageRestart'))
     } catch { Alert.alert(t('error'), t('settings_saveError')) }
   }
 
@@ -141,8 +167,12 @@ export default function Ayarlar() {
         sector: form.sector,
       })
       setProfile(prev => prev ? { ...prev, ...updated } : prev)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       Alert.alert(t('success'), t('settings_saved'))
-    } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed')) }
+    } catch (e: unknown) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed'))
+    }
     setSaving(false)
   }
 
@@ -228,6 +258,30 @@ export default function Ayarlar() {
       {/* ── İşletme Sekmesi ── */}
       {tab === 'isletme' && (
         <ScrollView style={s.body} keyboardShouldPersistTaps="handled">
+
+          {/* Plan özeti - EN ÜSTTE */}
+          <SectionCard title={t('subscription')}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={[s.planBadge, { backgroundColor: planColor + '15' }]}>
+                <View style={[s.planDot, { backgroundColor: planColor }]} />
+                <Text style={[s.planBadgeTxt, { color: planColor }]}>{t(`subscription_plan_${profile?.plan ?? 'BASLANGIC'}`)}</Text>
+              </View>
+              <TouchableOpacity style={s.upgradeLink} onPress={() => router.push('/abonelik' as never)}>
+                <Text style={s.upgradeTxt}>{t('subscription_upgrade')} →</Text>
+              </TouchableOpacity>
+            </View>
+            {profile?.planEndsAt && (
+              <Text style={s.planEnds}>{t('subscription_planEnds', { date: new Date(profile.planEndsAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) })}</Text>
+            )}
+            <View style={s.smsRow}>
+              <Text style={s.smsLabel}>SMS {t('total')}</Text>
+              <Text style={s.smsVal}>{profile?.smsUsed ?? 0} / {profile?.smsCredits ?? 0}</Text>
+            </View>
+            <View style={s.track}>
+              <View style={[s.fill, { width: `${Math.min(((profile?.smsUsed ?? 0) / Math.max(profile?.smsCredits ?? 1, 1)) * 100, 100)}%` as any }]} />
+            </View>
+          </SectionCard>
+
           <SectionCard title={t('settings_business')}>
             {/* Sektör seçici */}
             <Text style={s.fieldLabelSm}>{t('settings_sector')}</Text>
@@ -260,37 +314,20 @@ export default function Ayarlar() {
             <Field label={t('address')} value={form.address} onChange={v => setForm(f => ({ ...f, address: v }))} placeholder={t('settings_address_placeholder')} multiline />
 
             {profile?.slug && (
-              <View style={s.linkCard}>
-                <Ionicons name="link-outline" size={14} color="#7C3AED" />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.linkLabel}>{t('settings_online_link')}</Text>
-                  <Text style={s.linkValue}>hemensalon.com/r/{profile.slug}</Text>
+              <View style={{ position: 'relative' }}>
+                <View style={[s.linkCard, { opacity: 0.45 }]}>
+                  <Ionicons name="link-outline" size={14} color="#7C3AED" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.linkLabel}>{t('settings_online_link')}</Text>
+                    <Text style={s.linkValue}>hemensalon.com/r/{profile.slug}</Text>
+                  </View>
+                </View>
+                <View style={s.soonOverlay}>
+                  <Text style={s.soonOverlayTxt}>{t('settings_soon_badge')}</Text>
                 </View>
               </View>
             )}
-          </SectionCard>
 
-          {/* Plan özeti */}
-          <SectionCard title={t('subscription')}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={[s.planBadge, { backgroundColor: planColor + '15' }]}>
-                <View style={[s.planDot, { backgroundColor: planColor }]} />
-                <Text style={[s.planBadgeTxt, { color: planColor }]}>{t(`subscription_plan_${profile?.plan ?? 'BASLANGIC'}`)}</Text>
-              </View>
-              <TouchableOpacity style={s.upgradeLink} onPress={() => router.push('/abonelik' as never)}>
-                <Text style={s.upgradeTxt}>{t('subscription_upgrade')} →</Text>
-              </TouchableOpacity>
-            </View>
-            {profile?.planEndsAt && (
-              <Text style={s.planEnds}>{t('subscription_planEnds', { date: new Date(profile.planEndsAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) })}</Text>
-            )}
-            <View style={s.smsRow}>
-              <Text style={s.smsLabel}>SMS {t('total')}</Text>
-              <Text style={s.smsVal}>{profile?.smsUsed ?? 0} / {profile?.smsCredits ?? 0}</Text>
-            </View>
-            <View style={s.track}>
-              <View style={[s.fill, { width: `${Math.min(((profile?.smsUsed ?? 0) / Math.max(profile?.smsCredits ?? 1, 1)) * 100, 100)}%` as any }]} />
-            </View>
           </SectionCard>
 
           <TouchableOpacity style={s.saveBtn} onPress={handleSaveBusiness} disabled={saving}>
@@ -344,7 +381,7 @@ export default function Ayarlar() {
             </TouchableOpacity>
           </SectionCard>
 
-          <View style={{ height: 60 }} />
+          <View style={{ height: dockPad }} />
         </ScrollView>
       )}
 
@@ -388,7 +425,7 @@ export default function Ayarlar() {
           <TouchableOpacity style={[s.saveBtn, { marginTop: 8 }]} onPress={handleSaveHours} disabled={savingHours}>
             {savingHours ? <ActivityIndicator color="#fff" /> : <Text style={s.saveTxt}>{t('settings_save_hours')}</Text>}
           </TouchableOpacity>
-          <View style={{ height: 60 }} />
+          <View style={{ height: dockPad }} />
         </ScrollView>
       )}
 
@@ -399,7 +436,8 @@ export default function Ayarlar() {
             <IntegrationRow
               icon="card-outline" color="#635BFF" title="Stripe"
               desc={t('settings_stripe_desc')}
-              onPress={() => Linking.openURL('https://app.hemensalon.com/integrations/stripe')}
+              onPress={() => {}}
+              badge={t('settings_soon_badge')}
             />
           </SectionCard>
 
@@ -407,7 +445,8 @@ export default function Ayarlar() {
             <IntegrationRow
               icon="mail-outline" color="#059669" title="Resend"
               desc={t('settings_email_desc')}
-              onPress={() => Linking.openURL('https://app.hemensalon.com/integrations/email')}
+              onPress={() => {}}
+              badge={t('settings_soon_badge')}
             />
           </SectionCard>
 
@@ -415,7 +454,7 @@ export default function Ayarlar() {
             <IntegrationRow
               icon="calendar-outline" color="#4285F4" title="Google Calendar"
               desc={t('settings_gcal_desc')}
-              onPress={() => Linking.openURL('https://app.hemensalon.com/integrations/gcal')}
+              onPress={() => {}}
               badge={t('settings_soon_badge')}
             />
           </SectionCard>
@@ -424,7 +463,7 @@ export default function Ayarlar() {
             <IntegrationRow
               icon="notifications-outline" color="#D97706" title={t('settings_push_notif')}
               desc={t('settings_notif_desc')}
-              onPress={() => {}}
+              onPress={() => Linking.openSettings()}
               badge={t('settings_notif_badge')}
               badgeColor="#059669"
             />
@@ -492,7 +531,7 @@ export default function Ayarlar() {
             </TouchableOpacity>
           </SectionCard>
 
-          <View style={{ height: 60 }} />
+          <View style={{ height: dockPad }} />
         </ScrollView>
       )}
 
@@ -610,6 +649,10 @@ const s = StyleSheet.create({
   input: { backgroundColor: '#F9FAFB', padding: 13, borderRadius: 12, fontSize: 14, color: '#111827', borderWidth: 1.5, borderColor: '#E5E7EB' },
 
   linkCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F5F3FF', borderRadius: 12, padding: 12, marginTop: 4 },
+  soonOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  soonOverlayTxt: { fontSize: 11, fontWeight: '700', color: '#7C3AED', backgroundColor: '#EDE9FE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, overflow: 'hidden' },
+  billingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+  billingHeaderTxt: { fontSize: 14, fontWeight: '700', color: '#111827' },
   linkLabel: { fontSize: 11, fontWeight: '700', color: '#7C3AED', marginBottom: 2 },
   linkValue: { fontSize: 13, color: '#374151', fontWeight: '600' },
 

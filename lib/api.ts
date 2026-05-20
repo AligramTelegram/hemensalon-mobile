@@ -470,6 +470,14 @@ export type TenantProfile = {
   smsMonthlyLimit: number
   isTurkish: boolean
   reminderSettings?: ReminderSettings
+  ownerName?: string
+  ownerPhone?: string
+  ownerEmail?: string
+  ownerIdNumber?: string
+  ownerAddress?: string
+  ownerCity?: string
+  taxNumber?: string
+  taxOffice?: string
 }
 
 // ── API calls ──────────────────────────────────────────────────────────────

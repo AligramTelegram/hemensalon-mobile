@@ -5,12 +5,13 @@ import {
   Alert,
 } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
+import { useDockPad } from '@/lib/useDockPad'
+import { usePreferences } from '@/lib/usePreferences'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { api, DashboardStats, Product, Customer, PlanUsage } from '@/lib/api'
-import { detectCountry, getPricing } from '@/lib/pricing'
 import { supabase } from '@/lib/supabase'
 import { useTrial } from '@/lib/useTrial'
 import { useTranslation } from 'react-i18next'
@@ -38,10 +39,11 @@ export default function Dashboard() {
   const { t } = useTranslation()
   const router = useRouter()
   const headerPad = useHeaderPad()
+  const dockPad = useDockPad()
+  const { currencySymbol: symbol } = usePreferences()
   const trial = useTrial()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([])
-  const [symbol, setSymbol] = useState('₺')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [userName, setUserName] = useState('')
@@ -94,9 +96,8 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [data, country, { data: { user } }, products, usageData, notifs, readIdsRaw, allCustomers, tenantProfile] = await Promise.all([
+      const [data, { data: { user } }, products, usageData, notifs, readIdsRaw, allCustomers, tenantProfile] = await Promise.all([
         api.dashboard.stats(),
-        detectCountry(),
         supabase.auth.getUser(),
         api.products.list().catch(() => [] as Product[]),
         api.tenant.usage().catch(() => null),
@@ -107,7 +108,6 @@ export default function Dashboard() {
       ])
       setStats(data)
       setUsage(usageData)
-      setSymbol(getPricing(country).symbol)
       setUserName(tenantProfile?.name || (user?.email?.split('@')[0] ?? ''))
       setLowStockProducts(products.filter(p => p.isActive && p.quantity <= p.minQuantity))
       const readIds: Set<string> = readIdsRaw ? new Set(JSON.parse(readIdsRaw)) : new Set()
@@ -577,7 +577,7 @@ export default function Dashboard() {
           </View>
         )}
 
-        <View style={{ height: 108 }} />
+        <View style={{ height: dockPad }} />
       </ScrollView>
 
       {/* FAB overlay backdrop */}

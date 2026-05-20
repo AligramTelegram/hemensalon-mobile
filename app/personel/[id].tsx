@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { useHeaderPad } from '@/lib/useHeaderPad'
+import { usePreferences } from '@/lib/usePreferences'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
@@ -37,6 +38,7 @@ export default function PersonelDetay() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const headerPad = useHeaderPad()
+  const { currencySymbol } = usePreferences()
   const planFeatures = usePlanFeatures()
 
   const WORK_DAYS = [
@@ -276,7 +278,7 @@ export default function PersonelDetay() {
       <View style={s.statsRow}>
         <StatCard icon="calendar-outline" label={t('personel_this_month')} value={String(stats.count)} sub={t('personel_apt_label')} color={staff.color} />
         <StatCard icon="checkmark-done-outline" label={t('personel_completion_label')} value={`%${completionRate}`} sub={t('personel_rate_label')} color="#059669" />
-        <StatCard icon="wallet-outline" label={t('personel_revenue_label')} value={`₺${stats.revenue.toLocaleString()}`} sub={t('personel_this_month')} color="#D97706" />
+        <StatCard icon="wallet-outline" label={t('personel_revenue_label')} value={`${currencySymbol}${stats.revenue.toLocaleString()}`} sub={t('personel_this_month')} color="#D97706" />
       </View>
 
       {/* Sekmeler */}
@@ -356,10 +358,10 @@ export default function PersonelDetay() {
                 <View style={[s.commResult, { backgroundColor: staff.color + '10', borderColor: staff.color + '30' }]}>
                   <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '600' }}>{t('personel_estimated_commission')}</Text>
                   <Text style={[s.commAmount, { color: staff.color }]}>
-                    ₺{Math.round(stats.revenue * (parseFloat(commissionRate) / 100)).toLocaleString()}
+                    {currencySymbol}{Math.round(stats.revenue * (parseFloat(commissionRate) / 100)).toLocaleString()}
                   </Text>
                   <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
-                    ₺{stats.revenue.toLocaleString()} × %{commissionRate}
+                    {currencySymbol}{stats.revenue.toLocaleString()} × %{commissionRate}
                   </Text>
                 </View>
               )}
@@ -408,7 +410,7 @@ export default function PersonelDetay() {
                     <View style={[s.statusBadge, { backgroundColor: STATUS_COLOR[apt.status] + '18' }]}>
                       <Text style={[s.statusTxt2, { color: STATUS_COLOR[apt.status] }]}>{t(STATUS_LABEL_KEYS[apt.status] ?? 'status_pending')}</Text>
                     </View>
-                    <Text style={s.aptPrice}>₺{apt.price}</Text>
+                    <Text style={s.aptPrice}>{currencySymbol}{apt.price}</Text>
                   </View>
                 </View>
               ))

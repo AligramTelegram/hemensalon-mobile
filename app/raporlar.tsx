@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, RefreshControl, TextInput, Modal, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
+import { useDockPad } from '@/lib/useDockPad'
+import { usePreferences } from '@/lib/usePreferences'
 import { Ionicons } from '@expo/vector-icons'
 import { api, DashboardStats, ServiceRevenue, StaffRevenue } from '@/lib/api'
 import { detectCountry, getPricing } from '@/lib/pricing'
@@ -16,6 +18,8 @@ type Tab = 'general' | 'services' | 'staff'
 export default function Raporlar() {
   const { t } = useTranslation()
   const headerPad = useHeaderPad()
+  const dockPad = useDockPad()
+  const { currencySymbol: symbol } = usePreferences()
   const router = useRouter()
   const planFeatures = usePlanFeatures()
   const [tab, setTab] = useState<Tab>('general')
@@ -23,7 +27,6 @@ export default function Raporlar() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [services, setServices] = useState<ServiceRevenue[]>([])
   const [staff, setStaff] = useState<StaffRevenue[]>([])
-  const [symbol, setSymbol] = useState('₺')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [customFrom, setCustomFrom] = useState('')
@@ -46,9 +49,8 @@ export default function Raporlar() {
 
   const load = useCallback(async (p = period, from = customFrom, to = customTo) => {
     try {
-      const [data, country] = await Promise.all([api.dashboard.stats(), detectCountry()])
+      const data = await api.dashboard.stats()
       setStats(data)
-      setSymbol(getPricing(country).symbol)
     } catch {}
     try {
       const params = p === 'custom' && from && to ? `custom&from=${from}&to=${to}` : p
@@ -380,7 +382,7 @@ tbody td{padding:9px 12px;font-size:13px;border-bottom:1px solid #F3F4F6}
             </>
           )}
 
-          <View style={{ height: 40 }} />
+          <View style={{ height: dockPad }} />
         </ScrollView>
       )}
     </View>

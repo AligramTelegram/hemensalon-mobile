@@ -4,6 +4,7 @@ import {
   TextInput, Alert, ActivityIndicator, Platform, FlatList,
 } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
+import { usePreferences } from '@/lib/usePreferences'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
@@ -52,6 +53,7 @@ export default function YeniRandevu() {
   const { t } = useTranslation()
   const router = useRouter()
   const headerPad = useHeaderPad()
+  const { currencySymbol } = usePreferences()
   const params = useLocalSearchParams<{ customerId?: string; date?: string }>()
 
   const STEP_LABELS = [
@@ -210,7 +212,7 @@ export default function YeniRandevu() {
               content: {
                 title: t('apt_notif_title'),
                 body: t('apt_notif_body', { customer: customerLabel, service: selectedService!.name, time: selectedTime }),
-                sound: true,
+                sound: 'default',
               },
               trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: notifAt },
             })
@@ -489,7 +491,7 @@ export default function YeniRandevu() {
                 value={`${selectedTime} – ${endTime}`} />
               <SummaryRow icon="hourglass-outline" label={t('appointments_duration', { duration: '' }).trim()}
                 value={`${selectedService?.duration} dk`} />
-              <SummaryRow icon="cash-outline" label={t('apt_price_label')} value={price ? `₺${price}` : `₺${selectedService?.price ?? 0}`} last />
+              <SummaryRow icon="cash-outline" label={t('apt_price_label')} value={price ? `${currencySymbol}${price}` : `${currencySymbol}${selectedService?.price ?? 0}`} last />
             </View>
 
             {/* Not */}

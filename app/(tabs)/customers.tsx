@@ -151,8 +151,10 @@ export default function Customers() {
         if (pendingPhoto) await savePhoto(created.id, pendingPhoto)
         load()
       }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
     } catch (e: unknown) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       if (e instanceof PlanLimitError) {
         Alert.alert(
           t('customer_limit_title'),

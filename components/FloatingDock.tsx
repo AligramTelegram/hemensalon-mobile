@@ -4,6 +4,7 @@ import { useRouter, usePathname, useSegments } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
+import * as Haptics from 'expo-haptics'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -97,7 +98,7 @@ export function FloatingDock() {
               key={tab.name}
               tab={tab}
               focused={isActive(tab)}
-              onPress={() => router.navigate(tab.route as never)}
+              onPress={() => { Haptics.selectionAsync(); router.navigate(tab.route as never) }}
             />
           ))}
         </View>
