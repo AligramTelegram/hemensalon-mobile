@@ -282,7 +282,7 @@ export default function Appointments() {
     const d = new Date(filterDate)
     d.setDate(d.getDate() + offset)
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    setFilterDate(iso); setLoading(true); load(iso)
+    setFilterDate(iso)
   }
 
   const formattedDate = new Date(filterDate + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
@@ -476,7 +476,7 @@ export default function Appointments() {
           appointments={monthApts}
           onPrev={() => { const d = new Date(monthDate); d.setMonth(d.getMonth() - 1); setMonthDate(new Date(d)) }}
           onNext={() => { const d = new Date(monthDate); d.setMonth(d.getMonth() + 1); setMonthDate(new Date(d)) }}
-          onSelectDay={(iso) => { setFilterDate(iso); setViewMode('list'); load(iso) }}
+          onSelectDay={(iso) => { setFilterDate(iso); setViewMode('list') }}
         />
       ) : viewMode === 'calendar' ? (
         <WeeklyCalendar
@@ -485,7 +485,7 @@ export default function Appointments() {
           symbol={symbol}
           onPrev={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(new Date(d)) }}
           onNext={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(new Date(d)) }}
-          onSelectDay={(iso) => { setFilterDate(iso); setViewMode('list'); load(iso) }}
+          onSelectDay={(iso) => { setFilterDate(iso); setViewMode('list') }}
           onSelectApt={(a) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setDetailApt(a) }}
         />
       ) : (

@@ -179,7 +179,7 @@ export default function Finans() {
   async function markPaid(apt: Appointment) {
     try {
       await api.appointments.update(apt.id, { paid: true })
-      setDebts(prev => prev.filter(a => a.id !== apt.id))
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(period) })
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed')) }
   }
 
@@ -237,7 +237,7 @@ export default function Finans() {
           <View style={s.periodBar}>
             {PERIOD_OPTIONS.map(opt => (
               <TouchableOpacity key={opt.value} style={[s.periodBtn, period === opt.value && s.periodBtnActive]}
-                onPress={() => { setPeriod(opt.value); setLoading(true); load(opt.value) }}>
+                onPress={() => { setPeriod(opt.value) }}>
                 <Text style={[s.periodTxt, period === opt.value && s.periodTxtActive]}>{opt.label}</Text>
               </TouchableOpacity>
             ))}
