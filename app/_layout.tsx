@@ -21,10 +21,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 2 * 60 * 1000,      // 2 dakika: cached veri taze sayılır
-      gcTime: 10 * 60 * 1000,         // 10 dakika: bellek'te tutulur
-      retry: 2,
-      refetchOnWindowFocus: false,     // mobilde window focus yok
+      staleTime: 30 * 1000,           // 30 saniye: taze sayılır
+      gcTime: 10 * 60 * 1000,         // 10 dakika: bellekte tutulur
+      retry: 1,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,        // internet gelince yenile
     },
   },
 });
@@ -156,7 +157,7 @@ export default function RootLayout() {
     }
     setup();
 
-    // Gelen push bildirimlerini AsyncStorage'a kaydet
+    // Gelen push bildirimlerini AsyncStorage'a kaydet ve cache'i yenile
     const notifSub = Notifications.addNotificationReceivedListener(async (notif) => {
       try {
         const { impactAsync, ImpactFeedbackStyle } = await import('expo-haptics')
@@ -173,9 +174,11 @@ export default function RootLayout() {
           receivedAt: Date.now(),
           read: false,
         }
-        // Sonundan 50 adet tut
         const updated = [newEntry, ...list].slice(0, 50)
         await AsyncStorage.setItem(PUSH_NOTIFS_KEY, JSON.stringify(updated))
+        // Randevu ve dashboard cache'ini anında geçersiz kıl
+        queryClient.invalidateQueries({ queryKey: ['appointments'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       } catch {}
     })
 
@@ -290,13 +293,13 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
     <SafeAreaProvider>
     <ThemeProvider>
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 150 }}>
         <Stack.Screen name="(auth)/login" />
         <Stack.Screen name="(auth)/onboarding" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(staff)" />
-        <Stack.Screen name="hizmetler" options={{ animation: 'none' }} />
-        <Stack.Screen name="calisanlar" options={{ animation: 'none' }} />
+        <Stack.Screen name="hizmetler" />
+        <Stack.Screen name="calisanlar" />
         <Stack.Screen name="finans" />
         <Stack.Screen name="ayarlar" />
         <Stack.Screen name="raporlar" />
@@ -304,7 +307,7 @@ export default function RootLayout() {
         <Stack.Screen name="paketler" />
         <Stack.Screen name="abonelik" />
         <Stack.Screen name="musteri/[id]" />
-        <Stack.Screen name="randevu/yeni" />
+        <Stack.Screen name="randevu/yeni" options={{ animation: 'slide_from_bottom', animationDuration: 200 }} />
         <Stack.Screen name="kampanya" />
         <Stack.Screen name="personel/[id]" />
         <Stack.Screen name="promosyon" />

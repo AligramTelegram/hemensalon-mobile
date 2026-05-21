@@ -4,10 +4,12 @@ import { supabase } from '@/lib/supabase'
 import { getPricing } from '@/lib/pricing'
 import { usePreferences } from '@/lib/usePreferences'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function Settings() {
   const { t } = useTranslation()
   const { currency, currencySymbol } = usePreferences()
+  const queryClient = useQueryClient()
   const pricing = { ...getPricing(currency === 'TRY' ? 'TR' : currency === 'USD' ? 'US' : currency === 'EUR' ? 'DE' : currency === 'GBP' ? 'GB' : 'TR'), symbol: currencySymbol }
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(true)
@@ -34,6 +36,7 @@ export default function Settings() {
       {
         text: t('logout'), style: 'destructive', onPress: async () => {
           setLoggingOut(true)
+          queryClient.clear()
           await supabase.auth.signOut()
         },
       },

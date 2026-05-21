@@ -83,10 +83,19 @@ export default function Bildirimler() {
     await AsyncStorage.setItem(PUSH_NOTIFS_KEY, JSON.stringify(updated))
   }
 
-  // Son 24 saatte gelen push'lar "yeni"
   const now = Date.now()
-  const newPush = pushNotifs.filter(n => !n.read && now - n.receivedAt < 24 * 60 * 60 * 1000)
-  const oldPush = pushNotifs.filter(n => n.read || now - n.receivedAt >= 24 * 60 * 60 * 1000)
+  // DB bildirimlerindeki appointmentId'leri topla — push'larda bu event'leri tekrar gösterme
+  const dbAptIds = new Set(notifications.map(n => n.id))
+
+  // Push'ları sadece DB'de karşılığı olmayan veya çok yeni olanları göster
+  const filteredPush = pushNotifs.filter(n => {
+    const aptId = n.data?.appointmentId as string | undefined
+    if (aptId && dbAptIds.has(aptId)) return false  // zaten DB bildiriminde var
+    return true
+  })
+
+  const newPush = filteredPush.filter(n => !n.read && now - n.receivedAt < 24 * 60 * 60 * 1000)
+  const oldPush = filteredPush.filter(n => n.read || now - n.receivedAt >= 24 * 60 * 60 * 1000)
 
   const newNotifs = notifications.filter(n => n.isNew && !readIds.has(n.id))
   const oldNotifs = notifications.filter(n => !n.isNew || readIds.has(n.id))

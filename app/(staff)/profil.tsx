@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics'
 import { secureStorage } from '@/lib/secureStorage'
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 
 type StaffData = { name: string; staffId?: string; role?: string }
 
@@ -13,6 +14,7 @@ export default function StaffProfil() {
   const { t } = useTranslation()
   const router = useRouter()
   const headerPad = useHeaderPad()
+  const queryClient = useQueryClient()
   const [staffData, setStaffData] = useState<StaffData | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -29,6 +31,7 @@ export default function StaffProfil() {
       {
         text: t('logout'), style: 'destructive', onPress: async () => {
           setLoggingOut(true)
+          queryClient.clear()
           await secureStorage.removeItem('staff_token')
           await secureStorage.removeItem('staff_data')
           await secureStorage.removeItem('mobile_token')

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import { useFocusEffect } from 'expo-router'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Modal, TextInput, Alert, RefreshControl, ActivityIndicator,
@@ -47,8 +48,16 @@ export default function Stok() {
   const { data: products = [], isLoading: loading, refetch } = useQuery({
     queryKey: queryKeys.products(tenantId),
     queryFn: () => api.products.list(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
+    enabled: !!tenantId,
   })
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!tenantId) return
+      queryClient.invalidateQueries({ queryKey: queryKeys.products(tenantId) })
+    }, [tenantId, queryClient])
+  )
   const [search, setSearch] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)

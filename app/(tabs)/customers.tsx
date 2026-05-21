@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useFocusEffect } from 'expo-router'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Modal, TextInput, Alert, RefreshControl, ActivityIndicator,
@@ -58,7 +59,15 @@ export default function Customers() {
     queryKey: queryKeys.customers(tenantId),
     queryFn: () => api.customers.list(),
     staleTime: 2 * 60 * 1000,
+    enabled: !!tenantId,
   })
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!tenantId) return
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers(tenantId) })
+    }, [tenantId, queryClient])
+  )
 
   useEffect(() => {
     AsyncStorage.getItem('customer_photos').then(raw => {

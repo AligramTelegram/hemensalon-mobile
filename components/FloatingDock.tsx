@@ -87,7 +87,7 @@ export function FloatingDock() {
     return pathname.includes(tab.name)
   }
 
-  const bottomOffset = insets.bottom + 12
+  const bottomOffset = (insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 16 : 0)) + 12
 
   return (
     <View style={[s.wrapper, { bottom: bottomOffset }]} pointerEvents="box-none">

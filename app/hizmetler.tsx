@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import { useFocusEffect } from 'expo-router'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, ActivityIndicator, ScrollView, Platform, StyleProp, ViewStyle } from 'react-native'
 import { SkeletonScreen } from '@/components/SkeletonBox'
 import { useRouter } from 'expo-router'
@@ -35,7 +36,15 @@ export default function Hizmetler() {
     queryKey: queryKeys.services(tenantId),
     queryFn: () => api.services.list(),
     staleTime: 5 * 60 * 1000,
+    enabled: !!tenantId,
   })
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!tenantId) return
+      queryClient.invalidateQueries({ queryKey: queryKeys.services(tenantId) })
+    }, [tenantId, queryClient])
+  )
 
   // Service modal
   const [showSvcModal, setShowSvcModal] = useState(false)

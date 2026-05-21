@@ -100,7 +100,10 @@
       "Read(//c/Program Files/Android/Android Studio/jbr/bin/**)",
       "PowerShell(Test-Path \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\")",
       "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\\\\Android\" -ErrorAction SilentlyContinue | Select-Object Name)",
-      "Bash(git remote *)"
+      "Bash(git remote *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\muham\\\\Desktop\\\\salonapy-v2\\\\src\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)"
     ],
     "additionalDirectories": [
       "C:\\Users\\muham\\Desktop\\salonapy-v2\\src",

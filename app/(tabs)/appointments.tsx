@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
 import { useTenantId } from '@/lib/useTenantId'
+import { useFocusEffect } from 'expo-router'
 
 const STATUS_COLOR: Record<string, string> = {
   BEKLIYOR: '#D97706', ONAYLANDI: '#2563EB',
@@ -75,8 +76,16 @@ export default function Appointments() {
   const { data: appointments = [], isLoading: loading, refetch: refetchApts } = useQuery({
     queryKey: queryKeys.appointments(tenantId, filterDate),
     queryFn: () => api.appointments.list({ date: filterDate }),
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    enabled: !!tenantId,
   })
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!tenantId) return
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
+    }, [tenantId, filterDate, queryClient])
+  )
 
   const { data: staffList = [] } = useQuery({
     queryKey: queryKeys.staff(tenantId),
@@ -186,7 +195,7 @@ export default function Appointments() {
         price: parseFloat(form.price), notes: form.notes || undefined,
       })
       setShowNew(false)
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, form.date) })
+      queryClient.invalidateQueries({ queryKey: ['appointments', tenantId] })
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_createFailed')) }
     setSaving(false)
@@ -195,11 +204,18 @@ export default function Appointments() {
   async function handleStatusChange(id: string, status: string) {
     if (updatingStatusIds.current.has(id)) return
     updatingStatusIds.current.add(id)
+    // Önce UI'ı güncelle (optimistic)
+    setDetailApt(prev => prev?.id === id ? { ...prev, status: status as Appointment['status'] } : prev)
     try {
       const updated = await api.appointments.update(id, { status })
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
       setDetailApt(prev => prev?.id === id ? { ...prev, ...updated } : prev)
-    } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed')) }
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
+    } catch (e: unknown) {
+      // Hata olursa eski duruma geri al
+      setDetailApt(prev => prev?.id === id ? { ...prev, status: prev.status } : prev)
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed'))
+    }
     finally { updatingStatusIds.current.delete(id) }
   }
 

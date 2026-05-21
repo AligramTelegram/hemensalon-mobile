@@ -52,6 +52,8 @@ export default function Dashboard() {
 
   const { data: dashData, isLoading: loading, refetch: refetchDash } = useQuery({
     queryKey: queryKeys.dashboard(tenantId),
+    enabled: !!tenantId,
+    refetchInterval: 60 * 1000,
     queryFn: async () => {
       const [data, { data: { user } }, products, usageData, notifs, readIdsRaw, allCustomers, tenantProfile] = await Promise.all([
         api.dashboard.stats(),
@@ -128,24 +130,13 @@ export default function Dashboard() {
     Animated.spring(fabAnim, { toValue: 0, useNativeDriver: true, tension: 200, friction: 15 }).start()
   }
 
-  // Sayfaya odaklanınca cache süresi dolduysa otomatik yenile
+  // Sekmeye odaklanınca stale veri varsa yenile
   useFocusEffect(
     useCallback(() => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId), refetchType: 'none' })
-    }, [queryClient])
+      if (!tenantId) return
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
+    }, [tenantId, queryClient])
   )
-
-  // 1 dakikada bir otomatik yenile
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      setAutoRefreshing(true)
-      startSpinAnim()
-      await refetchDash()
-      setAutoRefreshing(false)
-      stopSpinAnim()
-    }, 60 * 1000)
-    return () => clearInterval(interval)
-  }, [refetchDash, startSpinAnim, stopSpinAnim])
 
   async function openNotifications() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)

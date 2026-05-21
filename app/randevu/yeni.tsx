@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, Platform, FlatList,
@@ -76,10 +77,6 @@ export default function YeniRandevu() {
   ]
 
   const [step, setStep] = useState<Step>(params.customerId ? 1 : 0)
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [services, setServices] = useState<Service[]>([])
-  const [staffList, setStaffList] = useState<Staff[]>([])
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [customerSearch, setCustomerSearch] = useState('')
 
@@ -92,40 +89,54 @@ export default function YeniRandevu() {
   const [selectedTime, setSelectedTime] = useState('10:00')
   const [price, setPrice] = useState('')
   const [notes, setNotes] = useState('')
-  const [existingAppointments, setExistingAppointments] = useState<{ startTime: string; endTime: string; staffId: string }[]>([])
   const [showSaveCustomerModal, setShowSaveCustomerModal] = useState(false)
 
   const days = nextWeekDays(14, t('today'), t('tomorrow'))
 
-  const load = useCallback(async () => {
-    try {
-      const [c, sv, st] = await Promise.all([
-        api.customers.list(),
-        api.services.list(),
-        api.staff.list(),
-      ])
-      setCustomers(c)
-      setServices(sv.filter(s => s.isActive))
-      setStaffList(st.filter(s => s.isActive))
+  const { data: customers = [], isLoading: loadingCustomers } = useQuery({
+    queryKey: queryKeys.customers(tenantId),
+    queryFn: () => api.customers.list(),
+    staleTime: 2 * 60 * 1000,
+    enabled: !!tenantId,
+  })
 
-      if (params.customerId) {
-        const found = c.find(x => x.id === params.customerId)
-        if (found) setSelectedCustomer(found)
-      }
-    } catch {}
-    setLoading(false)
-  }, [])
+  const { data: servicesRaw = [], isLoading: loadingServices } = useQuery({
+    queryKey: queryKeys.services(tenantId),
+    queryFn: () => api.services.list(),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!tenantId,
+  })
+  const services = useMemo(() => servicesRaw.filter(s => s.isActive), [servicesRaw])
 
-  useEffect(() => { load() }, [load])
+  const { data: staffRaw = [], isLoading: loadingStaff } = useQuery({
+    queryKey: queryKeys.staff(tenantId),
+    queryFn: () => api.staff.list(),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!tenantId,
+  })
+  const staffList = useMemo(() => staffRaw.filter(s => s.isActive), [staffRaw])
 
-  const endTime = selectedService ? addMinutes(selectedTime, selectedService.duration) : addMinutes(selectedTime, 60)
+  const { data: existingApts = [] } = useQuery({
+    queryKey: queryKeys.appointments(tenantId, selectedDate),
+    queryFn: () => api.appointments.list({ date: selectedDate }),
+    staleTime: 30 * 1000,
+    enabled: !!tenantId && !!selectedDate,
+  })
+  const existingAppointments = useMemo(() =>
+    existingApts.map(a => ({ startTime: a.startTime, endTime: a.endTime, staffId: a.staff?.id ?? '' })),
+    [existingApts]
+  )
+
+  const loading = loadingCustomers || loadingServices || loadingStaff
 
   useEffect(() => {
-    if (!selectedDate) return
-    api.appointments.list({ date: selectedDate })
-      .then(apts => setExistingAppointments(apts.map(a => ({ startTime: a.startTime, endTime: a.endTime, staffId: a.staff?.id ?? '' }))))
-      .catch(() => {})
-  }, [selectedDate])
+    if (params.customerId && customers.length > 0) {
+      const found = customers.find(x => x.id === params.customerId)
+      if (found && !selectedCustomer) setSelectedCustomer(found)
+    }
+  }, [customers, params.customerId])
+
+  const endTime = selectedService ? addMinutes(selectedTime, selectedService.duration) : addMinutes(selectedTime, 60)
 
   function hasConflict(time: string, staffId?: string): boolean {
     if (!staffId || !selectedService) return false
@@ -192,6 +203,7 @@ export default function YeniRandevu() {
       if (!customerId && guestName.trim()) {
         const created = await api.customers.create({ name: guestName.trim(), phone: guestPhone.trim() || '—' })
         customerId = created.id
+        queryClient.invalidateQueries({ queryKey: queryKeys.customers(tenantId) })
       }
       await api.appointments.create({
         customerId: customerId!,
@@ -204,8 +216,8 @@ export default function YeniRandevu() {
         notes: notes.trim() || undefined,
       })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-      // Randevu listesini ve dashboard'u anında güncelle
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, selectedDate) })
+      // Tüm tarihler ve dashboard anında güncellenir
+      queryClient.invalidateQueries({ queryKey: ['appointments', tenantId] })
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
 
       try {

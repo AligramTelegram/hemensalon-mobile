@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
+import { useFocusEffect } from 'expo-router'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, ActivityIndicator, ScrollView, Platform } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
@@ -42,8 +43,16 @@ export default function Finans() {
   const [period, setPeriod] = useState('month')
   const [refreshing, setRefreshing] = useState(false)
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!tenantId) return
+      queryClient.invalidateQueries({ queryKey: ['transactions', tenantId] })
+    }, [tenantId, queryClient])
+  )
+
   const { data: finData, isLoading: loading, refetch } = useQuery({
     queryKey: queryKeys.transactions(tenantId, period),
+    enabled: !!tenantId,
     queryFn: async () => {
       const [txs, profile] = await Promise.all([api.transactions.list(period), api.tenant.get().catch(() => null)])
       const today = new Date()
@@ -95,7 +104,7 @@ export default function Finans() {
       })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId, period) })
+      queryClient.invalidateQueries({ queryKey: ['transactions', tenantId] })
     } catch (e: unknown) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
@@ -107,7 +116,7 @@ export default function Finans() {
     Alert.alert(t('finans_deleteTitle'), t('finans_deleteConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.transactions.delete(tx.id); queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId, period) }) }
+        try { await api.transactions.delete(tx.id); queryClient.invalidateQueries({ queryKey: ['transactions', tenantId] }) }
         catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},
     ])
@@ -181,7 +190,7 @@ export default function Finans() {
   async function markPaid(apt: Appointment) {
     try {
       await api.appointments.update(apt.id, { paid: true })
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId, period) })
+      queryClient.invalidateQueries({ queryKey: ['transactions', tenantId] })
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed')) }
   }
 

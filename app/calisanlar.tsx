@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import { useFocusEffect } from 'expo-router'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, ActivityIndicator, ScrollView, Platform } from 'react-native'
 import { SkeletonScreen } from '@/components/SkeletonBox'
 import { useHeaderPad } from '@/lib/useHeaderPad'
@@ -26,7 +27,15 @@ export default function Calisanlar() {
     queryKey: queryKeys.staff(tenantId),
     queryFn: () => api.staff.list(),
     staleTime: 5 * 60 * 1000,
+    enabled: !!tenantId,
   })
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!tenantId) return
+      queryClient.invalidateQueries({ queryKey: queryKeys.staff(tenantId) })
+    }, [tenantId, queryClient])
+  )
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Staff | null>(null)
   const [form, setForm] = useState({ name: '', title: '', email: '', phone: '', color: '#7C3AED', password: '' })

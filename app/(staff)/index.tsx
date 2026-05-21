@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, Platform, Alert, ScrollView,
@@ -7,7 +7,7 @@ import { useHeaderPad } from '@/lib/useHeaderPad'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { secureStorage } from '@/lib/secureStorage'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { staffApi, Appointment } from '@/lib/api'
 import { SkeletonScreen } from '@/components/SkeletonBox'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -58,17 +58,28 @@ export default function StaffAppointments() {
   const { data: appointments = [], isLoading: loading, refetch } = useQuery({
     queryKey: queryKeys.staffAppointments('staff', selectedDate),
     queryFn: () => staffApi.appointments.list({ date: selectedDate }),
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
   })
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.staffAppointments('staff', selectedDate) })
+    }, [selectedDate, queryClient])
+  )
 
   async function handleStatusChange(apt: Appointment, status: string) {
     setUpdatingId(apt.id)
+    setSelectedApt(prev => prev?.id === apt.id ? { ...prev, status: status as Appointment['status'] } : prev)
     try {
       const updated = await staffApi.appointments.update(apt.id, { status })
-      queryClient.invalidateQueries({ queryKey: queryKeys.staffAppointments('staff', selectedDate) })
       setSelectedApt(prev => prev?.id === apt.id ? { ...prev, ...updated } : prev)
+      queryClient.invalidateQueries({ queryKey: queryKeys.staffAppointments('staff', selectedDate) })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-    } catch { Alert.alert(t('error'), t('err_updateFailed')) }
+    } catch {
+      setSelectedApt(prev => prev?.id === apt.id ? { ...prev, status: apt.status as Appointment['status'] } : prev)
+      Alert.alert(t('error'), t('err_updateFailed'))
+    }
     setUpdatingId(null)
   }
 
