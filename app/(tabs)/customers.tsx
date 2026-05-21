@@ -12,6 +12,7 @@ import { api, Customer, PlanLimitError } from '@/lib/api'
 import { SkeletonScreen } from '@/components/SkeletonBox'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
+import { useTenantId } from '@/lib/useTenantId'
 import { useTranslation } from 'react-i18next'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
@@ -40,6 +41,7 @@ export default function Customers() {
   const router = useRouter()
   const headerPad = useHeaderPad()
   const queryClient = useQueryClient()
+  const tenantId = useTenantId()
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('name')
@@ -53,9 +55,9 @@ export default function Customers() {
   const [pendingPhoto, setPendingPhoto] = useState<string | null>(null)
 
   const { data: customers = [], isLoading: loading, refetch: refetchCustomers } = useQuery({
-    queryKey: queryKeys.customers(),
+    queryKey: queryKeys.customers(tenantId),
     queryFn: () => api.customers.list(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
   })
 
   useEffect(() => {
@@ -142,12 +144,12 @@ export default function Customers() {
     try {
       if (editing) {
         const updated = await api.customers.update(editing.id, payload)
-        queryClient.invalidateQueries({ queryKey: queryKeys.customers() })
+        queryClient.invalidateQueries({ queryKey: queryKeys.customers(tenantId) })
         await savePhoto(editing.id, pendingPhoto)
       } else {
         const created = await api.customers.create(payload)
         if (pendingPhoto) await savePhoto(created.id, pendingPhoto)
-        queryClient.invalidateQueries({ queryKey: queryKeys.customers() })
+        queryClient.invalidateQueries({ queryKey: queryKeys.customers(tenantId) })
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
@@ -200,7 +202,7 @@ export default function Customers() {
     Alert.alert(t('customer_deleteTitle'), t('confirm_delete', { name: c.name }), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.customers.delete(c.id); queryClient.invalidateQueries({ queryKey: queryKeys.customers() }) }
+        try { await api.customers.delete(c.id); queryClient.invalidateQueries({ queryKey: queryKeys.customers(tenantId) }) }
         catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},
     ])

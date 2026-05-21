@@ -10,6 +10,7 @@ import { api, Transaction, Appointment, TenantProfile } from '@/lib/api'
 import { SkeletonScreen } from '@/components/SkeletonBox'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
+import { useTenantId } from '@/lib/useTenantId'
 import { generateAndShareInvoice } from '@/lib/invoice'
 import { useTranslation } from 'react-i18next'
 import { usePlanFeatures } from '@/lib/usePlanFeatures'
@@ -37,11 +38,12 @@ export default function Finans() {
   const planFeatures = usePlanFeatures()
   const [tab, setTab] = useState<Tab>('transactions')
   const queryClient = useQueryClient()
+  const tenantId = useTenantId()
   const [period, setPeriod] = useState('month')
   const [refreshing, setRefreshing] = useState(false)
 
   const { data: finData, isLoading: loading, refetch } = useQuery({
-    queryKey: queryKeys.transactions(period),
+    queryKey: queryKeys.transactions(tenantId, period),
     queryFn: async () => {
       const [txs, profile] = await Promise.all([api.transactions.list(period), api.tenant.get().catch(() => null)])
       const today = new Date()
@@ -54,7 +56,7 @@ export default function Finans() {
       )).flat()
       return { transactions: txs, tenantProfile: profile, debts: apts.filter((a: Appointment) => a.status === 'TAMAMLANDI' && a.paid === false) }
     },
-    staleTime: 3 * 60 * 1000,
+    staleTime: 60 * 1000,
   })
 
   const transactions = finData?.transactions ?? []
@@ -93,7 +95,7 @@ export default function Finans() {
       })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(period) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId, period) })
     } catch (e: unknown) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
@@ -105,7 +107,7 @@ export default function Finans() {
     Alert.alert(t('finans_deleteTitle'), t('finans_deleteConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.transactions.delete(tx.id); queryClient.invalidateQueries({ queryKey: queryKeys.transactions(period) }) }
+        try { await api.transactions.delete(tx.id); queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId, period) }) }
         catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},
     ])
@@ -179,7 +181,7 @@ export default function Finans() {
   async function markPaid(apt: Appointment) {
     try {
       await api.appointments.update(apt.id, { paid: true })
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(period) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId, period) })
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed')) }
   }
 

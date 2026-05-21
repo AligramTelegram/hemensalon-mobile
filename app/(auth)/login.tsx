@@ -11,6 +11,9 @@ import * as Haptics from 'expo-haptics'
 import { supabase } from '@/lib/supabase'
 import { secureStorage } from '@/lib/secureStorage'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
+import { api } from '@/lib/api'
+import { queryKeys } from '@/lib/queryKeys'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 
@@ -52,6 +55,7 @@ const FEATURES: { icon: IoniconsName; color: string; bg: string; titleKey: strin
 export default function Login() {
   const { t } = useTranslation()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const headerPad = useHeaderPad()
   const [mode, setMode] = useState<Mode>('landing')
   const [activeCard, setActiveCard] = useState(0)
@@ -120,6 +124,17 @@ export default function Login() {
           await secureStorage.setItem('session_expires_at', (expiresAt * 1000).toString())
         }
       }
+      // Tenant bilgisini al ve kritik verileri önceden yükle
+      try {
+        const tenant = await api.tenant.get()
+        const tid = tenant.id
+        const today = new Date()
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+        await Promise.all([
+          queryClient.prefetchQuery({ queryKey: queryKeys.dashboard(tid), queryFn: () => api.dashboard.stats(), staleTime: 60 * 1000 }),
+          queryClient.prefetchQuery({ queryKey: queryKeys.appointments(tid, todayStr), queryFn: () => api.appointments.list({ date: todayStr }), staleTime: 60 * 1000 }),
+        ])
+      } catch { /* prefetch başarısız olsa bile devam et */ }
       setLoading(false)
       router.replace('/(tabs)')
     } else {

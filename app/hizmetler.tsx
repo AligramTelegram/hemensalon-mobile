@@ -11,6 +11,7 @@ import { api, Service } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
+import { useTenantId } from '@/lib/useTenantId'
 
 const COLORS = ['#7C3AED', '#2563EB', '#059669', '#D97706', '#DC2626', '#0891B2', '#DB2777', '#EA580C']
 
@@ -28,11 +29,12 @@ export default function Hizmetler() {
   const { currencySymbol } = usePreferences()
   const router = useRouter()
   const queryClient = useQueryClient()
+  const tenantId = useTenantId()
   const [refreshing, setRefreshing] = useState(false)
   const { data: services = [], isLoading: loading, refetch } = useQuery({
-    queryKey: queryKeys.services(),
+    queryKey: queryKeys.services(tenantId),
     queryFn: () => api.services.list(),
-    staleTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   })
 
   // Service modal
@@ -63,10 +65,10 @@ export default function Hizmetler() {
       const body = { name: svcForm.name, description: svcForm.description || undefined, duration: parseInt(svcForm.duration), price: parseFloat(svcForm.price), color: svcForm.color }
       if (editingSvc) {
         const updated = await api.services.update(editingSvc.id, body)
-        queryClient.invalidateQueries({ queryKey: queryKeys.services() })
+        queryClient.invalidateQueries({ queryKey: queryKeys.services(tenantId) })
       } else {
         await api.services.create(body)
-        queryClient.invalidateQueries({ queryKey: queryKeys.services() })
+        queryClient.invalidateQueries({ queryKey: queryKeys.services(tenantId) })
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowSvcModal(false)
@@ -81,7 +83,7 @@ export default function Hizmetler() {
     Alert.alert(t('hizmet_deleteTitle'), t('confirm_delete', { name: sv.name }), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.services.delete(sv.id); queryClient.invalidateQueries({ queryKey: queryKeys.services() }) }
+        try { await api.services.delete(sv.id); queryClient.invalidateQueries({ queryKey: queryKeys.services(tenantId) }) }
         catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},
     ])
@@ -90,7 +92,7 @@ export default function Hizmetler() {
   async function toggleActiveSvc(sv: Service) {
     try {
       const updated = await api.services.update(sv.id, { isActive: !sv.isActive })
-      queryClient.invalidateQueries({ queryKey: queryKeys.services() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.services(tenantId) })
     } catch {}
   }
 

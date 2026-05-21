@@ -15,6 +15,7 @@ import { api, DashboardStats, Product, Customer, PlanUsage } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
+import { useTenantId } from '@/lib/useTenantId'
 import { useTrial } from '@/lib/useTrial'
 import { useTranslation } from 'react-i18next'
 
@@ -45,11 +46,12 @@ export default function Dashboard() {
   const { currencySymbol: symbol } = usePreferences()
   const trial = useTrial()
   const queryClient = useQueryClient()
+  const tenantId = useTenantId()
   const [userName, setUserName] = useState('')
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
 
   const { data: dashData, isLoading: loading, refetch: refetchDash } = useQuery({
-    queryKey: queryKeys.dashboard(),
+    queryKey: queryKeys.dashboard(tenantId),
     queryFn: async () => {
       const [data, { data: { user } }, products, usageData, notifs, readIdsRaw, allCustomers, tenantProfile] = await Promise.all([
         api.dashboard.stats(),
@@ -73,7 +75,7 @@ export default function Dashboard() {
         return diff >= 0 && diff <= 7
       }), tenantProfile }
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
   })
 
   const stats = dashData?.stats ?? null
@@ -129,7 +131,7 @@ export default function Dashboard() {
   // Sayfaya odaklanınca cache süresi dolduysa otomatik yenile
   useFocusEffect(
     useCallback(() => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(), refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId), refetchType: 'none' })
     }, [queryClient])
   )
 

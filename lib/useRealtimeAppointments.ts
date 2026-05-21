@@ -26,7 +26,7 @@ export function useRealtimeAppointments(tenantId?: string) {
         () => {
           // Tüm appointments cache'lerini ve dashboard'u sıfırla
           queryClient.invalidateQueries({ queryKey: ['appointments'] })
-          queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() })
+          queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
         }
       )
       .subscribe()

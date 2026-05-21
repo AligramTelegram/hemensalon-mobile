@@ -13,6 +13,7 @@ import { api, Appointment, Customer, Service, Staff, WaitingEntry } from '@/lib/
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
+import { useTenantId } from '@/lib/useTenantId'
 
 const STATUS_COLOR: Record<string, string> = {
   BEKLIYOR: '#D97706', ONAYLANDI: '#2563EB',
@@ -46,6 +47,7 @@ export default function Appointments() {
   const headerPad = useHeaderPad()
   const { currencySymbol: symbol } = usePreferences()
   const queryClient = useQueryClient()
+  const tenantId = useTenantId()
   const [refreshing, setRefreshing] = useState(false)
   const [filterDate, setFilterDate] = useState(todayISO())
   const [statusFilter, setStatusFilter] = useState('ALL')
@@ -71,19 +73,19 @@ export default function Appointments() {
   const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 
   const { data: appointments = [], isLoading: loading, refetch: refetchApts } = useQuery({
-    queryKey: queryKeys.appointments(filterDate),
+    queryKey: queryKeys.appointments(tenantId, filterDate),
     queryFn: () => api.appointments.list({ date: filterDate }),
     staleTime: 60 * 1000,
   })
 
   const { data: staffList = [] } = useQuery({
-    queryKey: queryKeys.staff(),
+    queryKey: queryKeys.staff(tenantId),
     queryFn: () => api.staff.list(),
     staleTime: 10 * 60 * 1000,
   })
 
   const { data: waitingList = [], isLoading: waitingLoading, refetch: refetchWaiting } = useQuery({
-    queryKey: queryKeys.waitingList(),
+    queryKey: queryKeys.waitingList(tenantId),
     queryFn: () => api.waitingList.list(),
     staleTime: 60 * 1000,
     enabled: mainTab === 'bekleme',
@@ -92,7 +94,7 @@ export default function Appointments() {
   const weekFrom = toISO(weekStart)
   const weekTo = toISO(new Date(new Date(weekStart).setDate(weekStart.getDate() + 6)))
   const { data: weekApts = [] } = useQuery({
-    queryKey: ['appointments', 'week', weekFrom, weekTo],
+    queryKey: ['appointments', tenantId, 'week', weekFrom, weekTo],
     queryFn: () => api.appointments.list({ from: weekFrom, to: weekTo }),
     staleTime: 60 * 1000,
     enabled: viewMode === 'calendar',
@@ -101,7 +103,7 @@ export default function Appointments() {
   const monthFrom = toISO(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1))
   const monthTo = toISO(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0))
   const { data: monthApts = [] } = useQuery({
-    queryKey: ['appointments', 'month', monthFrom, monthTo],
+    queryKey: ['appointments', tenantId, 'month', monthFrom, monthTo],
     queryFn: () => api.appointments.list({ from: monthFrom, to: monthTo }),
     staleTime: 60 * 1000,
     enabled: viewMode === 'month',
@@ -116,13 +118,13 @@ export default function Appointments() {
     : staffList
 
   const { data: customers = [] } = useQuery({
-    queryKey: queryKeys.customers(),
+    queryKey: queryKeys.customers(tenantId),
     queryFn: () => api.customers.list(),
     staleTime: 5 * 60 * 1000,
   })
 
   const { data: services = [] } = useQuery({
-    queryKey: queryKeys.services(),
+    queryKey: queryKeys.services(tenantId),
     queryFn: () => api.services.list(),
     staleTime: 10 * 60 * 1000,
   })
@@ -141,7 +143,7 @@ export default function Appointments() {
         preferredTime: waitingForm.preferredTime || undefined,
         notes: waitingForm.notes || undefined,
       })
-      queryClient.invalidateQueries({ queryKey: queryKeys.waitingList() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.waitingList(tenantId) })
       setShowWaitingModal(false)
       setWaitingForm({ customerName: '', customerPhone: '', serviceName: '', preferredDate: '', preferredTime: '', notes: '' })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
@@ -152,7 +154,7 @@ export default function Appointments() {
   async function handleWaitingStatus(id: string, status: 'BILDIRILDI' | 'IPTAL') {
     try {
       const updated = await api.waitingList.update(id, { status })
-      queryClient.invalidateQueries({ queryKey: queryKeys.waitingList() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.waitingList(tenantId) })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch { Alert.alert(t('error'), t('err_updateFailed')) }
   }
@@ -161,7 +163,7 @@ export default function Appointments() {
     Alert.alert(t('delete'), t('waiting_deleteConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.waitingList.delete(id); queryClient.invalidateQueries({ queryKey: queryKeys.waitingList() }) }
+        try { await api.waitingList.delete(id); queryClient.invalidateQueries({ queryKey: queryKeys.waitingList(tenantId) }) }
         catch { Alert.alert(t('error'), t('err_deleteFailed')) }
       }},
     ])
@@ -184,8 +186,8 @@ export default function Appointments() {
         price: parseFloat(form.price), notes: form.notes || undefined,
       })
       setShowNew(false)
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(form.date) })
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, form.date) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_createFailed')) }
     setSaving(false)
   }
@@ -195,7 +197,7 @@ export default function Appointments() {
     updatingStatusIds.current.add(id)
     try {
       const updated = await api.appointments.update(id, { status })
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(filterDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
       setDetailApt(prev => prev?.id === id ? { ...prev, ...updated } : prev)
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed')) }
     finally { updatingStatusIds.current.delete(id) }
@@ -241,7 +243,7 @@ export default function Appointments() {
         notes: editForm.notes || undefined,
       })
       setDetailApt(prev => prev ? { ...prev, ...updated } : prev)
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(filterDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
       setEditMode(false)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch (e: unknown) {
@@ -254,7 +256,7 @@ export default function Appointments() {
     try {
       await api.appointments.update(id, { paid })
       setDetailApt(prev => prev?.id === id ? { ...prev, paid } : prev)
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(filterDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
       Haptics.selectionAsync()
     } catch { Alert.alert(t('error'), t('appointments_paymentUpdated')) }
   }
@@ -266,7 +268,7 @@ export default function Appointments() {
       { text: t('delete'), style: 'destructive', onPress: async () => {
         try {
           await api.appointments.update(id, { status: 'IPTAL' })
-          queryClient.invalidateQueries({ queryKey: queryKeys.appointments(filterDate) })
+          queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
           setDetailApt(null)
         } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},

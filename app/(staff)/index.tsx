@@ -56,7 +56,7 @@ export default function StaffAppointments() {
   }, [])
 
   const { data: appointments = [], isLoading: loading, refetch } = useQuery({
-    queryKey: queryKeys.staffAppointments(selectedDate),
+    queryKey: queryKeys.staffAppointments('staff', selectedDate),
     queryFn: () => staffApi.appointments.list({ date: selectedDate }),
     staleTime: 60 * 1000,
   })
@@ -65,7 +65,7 @@ export default function StaffAppointments() {
     setUpdatingId(apt.id)
     try {
       const updated = await staffApi.appointments.update(apt.id, { status })
-      queryClient.invalidateQueries({ queryKey: queryKeys.staffAppointments(selectedDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.staffAppointments('staff', selectedDate) })
       setSelectedApt(prev => prev?.id === apt.id ? { ...prev, ...updated } : prev)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch { Alert.alert(t('error'), t('err_updateFailed')) }

@@ -13,6 +13,7 @@ import { api, Product, StockMovement } from '@/lib/api'
 import { SkeletonScreen } from '@/components/SkeletonBox'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
+import { useTenantId } from '@/lib/useTenantId'
 import { useTranslation } from 'react-i18next'
 import { usePlanFeatures } from '@/lib/usePlanFeatures'
 import UpgradeOverlay from '@/components/UpgradeOverlay'
@@ -41,9 +42,10 @@ export default function Stok() {
   const router = useRouter()
   const planFeatures = usePlanFeatures()
   const queryClient = useQueryClient()
+  const tenantId = useTenantId()
   const [refreshing, setRefreshing] = useState(false)
   const { data: products = [], isLoading: loading, refetch } = useQuery({
-    queryKey: queryKeys.products(),
+    queryKey: queryKeys.products(tenantId),
     queryFn: () => api.products.list(),
     staleTime: 5 * 60 * 1000,
   })
@@ -104,10 +106,10 @@ export default function Stok() {
       }
       if (editing) {
         const updated = await api.products.update(editing.id, payload)
-        queryClient.invalidateQueries({ queryKey: queryKeys.products() })
+        queryClient.invalidateQueries({ queryKey: queryKeys.products(tenantId) })
       } else {
         await api.products.create(payload)
-        queryClient.invalidateQueries({ queryKey: queryKeys.products() })
+        queryClient.invalidateQueries({ queryKey: queryKeys.products(tenantId) })
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowNew(false)
@@ -123,7 +125,7 @@ export default function Stok() {
     setSaving(true)
     try {
       const updated = await api.products.movement(movementProduct.id, movementType, parseFloat(movementQty), movementNote || undefined)
-      queryClient.invalidateQueries({ queryKey: queryKeys.products() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.products(tenantId) })
       setMovementProduct(null); setMovementQty(''); setMovementNote('')
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed')) }
     setSaving(false)
@@ -141,7 +143,7 @@ export default function Stok() {
     Alert.alert(t('stok_delete_title'), t('confirm_delete', { name: p.name }), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.products.delete(p.id); queryClient.invalidateQueries({ queryKey: queryKeys.products() }) }
+        try { await api.products.delete(p.id); queryClient.invalidateQueries({ queryKey: queryKeys.products(tenantId) }) }
         catch { Alert.alert(t('error'), t('err_failed')) }
       }},
     ])

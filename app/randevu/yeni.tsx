@@ -11,6 +11,9 @@ import * as Haptics from 'expo-haptics'
 import { api, Customer, Service, Staff, PlanLimitError } from '@/lib/api'
 import * as Notifications from 'expo-notifications'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
+import { useTenantId } from '@/lib/useTenantId'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 type Step = 0 | 1 | 2 | 3
@@ -52,6 +55,8 @@ const STEP_ICONS: IoniconsName[] = ['person-outline', 'cut-outline', 'calendar-o
 export default function YeniRandevu() {
   const { t } = useTranslation()
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const tenantId = useTenantId()
   const headerPad = useHeaderPad()
   const { currencySymbol } = usePreferences()
   const params = useLocalSearchParams<{ customerId?: string; date?: string }>()
@@ -199,6 +204,9 @@ export default function YeniRandevu() {
         notes: notes.trim() || undefined,
       })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      // Randevu listesini ve dashboard'u anında güncelle
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, selectedDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
 
       try {
         const aptDateTime = new Date(`${selectedDate}T${selectedTime}:00`)

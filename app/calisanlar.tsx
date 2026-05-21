@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { usePlanFeatures } from '@/lib/usePlanFeatures'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
+import { useTenantId } from '@/lib/useTenantId'
 
 const COLORS = ['#7C3AED', '#2563EB', '#059669', '#D97706', '#DC2626', '#0891B2', '#DB2777', '#EA580C']
 
@@ -19,11 +20,12 @@ export default function Calisanlar() {
   const headerPad = useHeaderPad()
   const planFeatures = usePlanFeatures()
   const queryClient = useQueryClient()
+  const tenantId = useTenantId()
   const [refreshing, setRefreshing] = useState(false)
   const { data: staff = [], isLoading: loading, refetch } = useQuery({
-    queryKey: queryKeys.staff(),
+    queryKey: queryKeys.staff(tenantId),
     queryFn: () => api.staff.list(),
-    staleTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   })
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Staff | null>(null)
@@ -58,7 +60,7 @@ export default function Calisanlar() {
             setDeleting(st.id)
             try {
               await api.staff.delete(st.id)
-              queryClient.invalidateQueries({ queryKey: queryKeys.staff() })
+              queryClient.invalidateQueries({ queryKey: queryKeys.staff(tenantId) })
             } catch {
               Alert.alert(t('error'), t('err_failed'))
             }
@@ -78,10 +80,10 @@ export default function Calisanlar() {
       const body = { name: form.name, title: form.title || undefined, email: form.email || undefined, phone: form.phone || undefined, color: form.color, ...(form.password ? { password: form.password } : {}) }
       if (editing) {
         const updated = await api.staff.update(editing.id, body)
-        queryClient.invalidateQueries({ queryKey: queryKeys.staff() })
+        queryClient.invalidateQueries({ queryKey: queryKeys.staff(tenantId) })
       } else {
         await api.staff.create(body)
-        queryClient.invalidateQueries({ queryKey: queryKeys.staff() })
+        queryClient.invalidateQueries({ queryKey: queryKeys.staff(tenantId) })
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
