@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Modal, TextInput, Alert, RefreshControl, ActivityIndicator,
@@ -10,6 +10,9 @@ import { usePreferences } from '@/lib/usePreferences'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, Product, StockMovement } from '@/lib/api'
+import { SkeletonScreen } from '@/components/SkeletonBox'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { usePlanFeatures } from '@/lib/usePlanFeatures'
 import UpgradeOverlay from '@/components/UpgradeOverlay'
@@ -37,9 +40,13 @@ export default function Stok() {
   const { currencySymbol } = usePreferences()
   const router = useRouter()
   const planFeatures = usePlanFeatures()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
+  const { data: products = [], isLoading: loading, refetch } = useQuery({
+    queryKey: queryKeys.products(),
+    queryFn: () => api.products.list(),
+    staleTime: 5 * 60 * 1000,
+  })
   const [search, setSearch] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
@@ -56,12 +63,6 @@ export default function Stok() {
     quantity: '0', minQuantity: '5', costPrice: '', sellPrice: '',
   })
 
-  const load = useCallback(async () => {
-    try { setProducts(await api.products.list()) } catch {}
-    setLoading(false); setRefreshing(false)
-  }, [])
-
-  useEffect(() => { load() }, [load])
 
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -103,10 +104,10 @@ export default function Stok() {
       }
       if (editing) {
         const updated = await api.products.update(editing.id, payload)
-        setProducts(prev => prev.map(p => p.id === editing.id ? { ...p, ...updated } : p))
+        queryClient.invalidateQueries({ queryKey: queryKeys.products() })
       } else {
         await api.products.create(payload)
-        load()
+        queryClient.invalidateQueries({ queryKey: queryKeys.products() })
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowNew(false)
@@ -122,7 +123,7 @@ export default function Stok() {
     setSaving(true)
     try {
       const updated = await api.products.movement(movementProduct.id, movementType, parseFloat(movementQty), movementNote || undefined)
-      setProducts(prev => prev.map(p => p.id === movementProduct.id ? { ...p, ...updated } : p))
+      queryClient.invalidateQueries({ queryKey: queryKeys.products() })
       setMovementProduct(null); setMovementQty(''); setMovementNote('')
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed')) }
     setSaving(false)
@@ -140,7 +141,7 @@ export default function Stok() {
     Alert.alert(t('stok_delete_title'), t('confirm_delete', { name: p.name }), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.products.delete(p.id); setProducts(prev => prev.filter(x => x.id !== p.id)) }
+        try { await api.products.delete(p.id); queryClient.invalidateQueries({ queryKey: queryKeys.products() }) }
         catch { Alert.alert(t('error'), t('err_failed')) }
       }},
     ])
@@ -181,14 +182,12 @@ export default function Stok() {
         {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color="#9CA3AF" /></TouchableOpacity>}
       </View>
 
-      {loading ? (
-        <View style={s.center}><ActivityIndicator color="#059669" /></View>
-      ) : (
+      {loading ? <SkeletonScreen rows={6} /> : (
         <FlatList
           data={filtered}
           keyExtractor={i => i.id}
           contentContainerStyle={{ padding: 12, paddingBottom: 108 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#059669" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetch(); setRefreshing(false) }} tintColor="#059669" />}
           ListEmptyComponent={<Text style={s.empty}>{t('stok_empty')}</Text>}
           renderItem={({ item }) => {
             const low = item.quantity <= item.minQuantity

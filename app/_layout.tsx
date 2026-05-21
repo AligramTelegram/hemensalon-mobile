@@ -16,6 +16,18 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { secureStorage } from '@/lib/secureStorage';
 import { scheduleTips } from '@/lib/scheduleTips';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000,      // 2 dakika: cached veri taze sayılır
+      gcTime: 10 * 60 * 1000,         // 10 dakika: bellek'te tutulur
+      retry: 2,
+      refetchOnWindowFocus: false,     // mobilde window focus yok
+    },
+  },
+});
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true, shouldShowBanner: true, shouldShowList: true }),
@@ -275,6 +287,7 @@ export default function RootLayout() {
   }
 
   return (
+    <QueryClientProvider client={queryClient}>
     <SafeAreaProvider>
     <ThemeProvider>
       <Stack screenOptions={{ headerShown: false }}>
@@ -303,5 +316,6 @@ export default function RootLayout() {
       {!splashDone && <SplashAnimation onFinish={() => setSplashDone(true)} />}
     </ThemeProvider>
     </SafeAreaProvider>
+    </QueryClientProvider>
   );
 }

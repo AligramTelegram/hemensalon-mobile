@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, ActivityIndicator, ScrollView, Platform } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
@@ -7,6 +7,9 @@ import { usePreferences } from '@/lib/usePreferences'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, Transaction, Appointment, TenantProfile } from '@/lib/api'
+import { SkeletonScreen } from '@/components/SkeletonBox'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 import { generateAndShareInvoice } from '@/lib/invoice'
 import { useTranslation } from 'react-i18next'
 import { usePlanFeatures } from '@/lib/usePlanFeatures'
@@ -33,12 +36,30 @@ export default function Finans() {
   const { currencySymbol } = usePreferences()
   const planFeatures = usePlanFeatures()
   const [tab, setTab] = useState<Tab>('transactions')
-  const [tenantProfile, setTenantProfile] = useState<TenantProfile | null>(null)
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [debts, setDebts] = useState<Appointment[]>([])
+  const queryClient = useQueryClient()
   const [period, setPeriod] = useState('month')
-  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+
+  const { data: finData, isLoading: loading, refetch } = useQuery({
+    queryKey: queryKeys.transactions(period),
+    queryFn: async () => {
+      const [txs, profile] = await Promise.all([api.transactions.list(period), api.tenant.get().catch(() => null)])
+      const today = new Date()
+      const days = Array.from({ length: 15 }, (_, i) => {
+        const d = new Date(today); d.setDate(d.getDate() - i)
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      })
+      const apts: Appointment[] = (await Promise.all(
+        days.map(date => api.appointments.list({ date }).catch(() => []))
+      )).flat()
+      return { transactions: txs, tenantProfile: profile, debts: apts.filter((a: Appointment) => a.status === 'TAMAMLANDI' && a.paid === false) }
+    },
+    staleTime: 3 * 60 * 1000,
+  })
+
+  const transactions = finData?.transactions ?? []
+  const tenantProfile = finData?.tenantProfile ?? null
+  const debts = finData?.debts ?? []
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({
     type: 'GELIR' as 'GELIR' | 'GIDER',
@@ -51,30 +72,6 @@ export default function Finans() {
   })
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(async (p = period) => {
-    try {
-      const [txs, profile] = await Promise.all([api.transactions.list(p), api.tenant.get()])
-      setTransactions(txs)
-      setTenantProfile(profile)
-    } catch { try { setTransactions(await api.transactions.list(p)) } catch {} }
-
-    // Alacaklar: son 90 günde tamamlanan ama ödenmemiş randevular
-    try {
-      const today = new Date()
-      const days = Array.from({ length: 30 }, (_, i) => {
-        const d = new Date(today); d.setDate(d.getDate() - i); return toISO(d)
-      })
-      const apts: Appointment[] = (await Promise.all(
-        days.slice(0, 15).map(date => api.appointments.list({ date }).catch(() => []))
-      )).flat()
-      setDebts(apts.filter(a => a.status === 'TAMAMLANDI' && a.paid === false))
-    } catch {}
-
-    setLoading(false)
-    setRefreshing(false)
-  }, [period])
-
-  useEffect(() => { load() }, [load])
 
   const revenue = transactions.filter(tx => tx.type === 'GELIR').reduce((s, tx) => s + tx.amount, 0)
   const expense = transactions.filter(tx => tx.type === 'GIDER').reduce((s, tx) => s + tx.amount, 0)
@@ -96,7 +93,7 @@ export default function Finans() {
       })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
-      load()
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(period) })
     } catch (e: unknown) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
@@ -108,7 +105,7 @@ export default function Finans() {
     Alert.alert(t('finans_deleteTitle'), t('finans_deleteConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.transactions.delete(tx.id); setTransactions(prev => prev.filter(x => x.id !== tx.id)) }
+        try { await api.transactions.delete(tx.id); queryClient.invalidateQueries({ queryKey: queryKeys.transactions(period) }) }
         catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},
     ])
@@ -265,12 +262,12 @@ export default function Finans() {
             </View>
           </View>
 
-          {loading ? <View style={s.center}><ActivityIndicator color="#7C3AED" /></View> : (
+          {loading ? <SkeletonScreen rows={5} /> : (
             <FlatList
               data={transactions}
               keyExtractor={i => i.id}
               contentContainerStyle={{ padding: 12, paddingBottom: dockPad }}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetch(); setRefreshing(false) }} tintColor="#7C3AED" />}
               ListEmptyComponent={<Text style={s.empty}>{t('finans_empty')}</Text>}
               renderItem={({ item }) => {
                 const pm = PAYMENT_METHODS.find(p => p.value === item.paymentMethod)
@@ -316,7 +313,7 @@ export default function Finans() {
 
       {tab === 'debts' && (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12, paddingBottom: dockPad }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}>
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetch(); setRefreshing(false) }} tintColor="#7C3AED" />}>
 
           {debts.length > 0 && (
             <View style={s.debtSummary}>
@@ -325,7 +322,7 @@ export default function Finans() {
             </View>
           )}
 
-          {loading ? <ActivityIndicator color="#7C3AED" style={{ marginTop: 40 }} /> :
+          {loading ? <SkeletonScreen rows={4} /> :
             debts.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 60 }}>
                 <Ionicons name="checkmark-circle-outline" size={56} color="#D1FAE5" />

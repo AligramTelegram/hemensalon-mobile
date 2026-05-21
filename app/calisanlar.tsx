@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, ActivityIndicator, ScrollView, Platform } from 'react-native'
+import { SkeletonScreen } from '@/components/SkeletonBox'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -7,6 +8,8 @@ import * as Haptics from 'expo-haptics'
 import { api, Staff, PlanLimitError } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
 import { usePlanFeatures } from '@/lib/usePlanFeatures'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 
 const COLORS = ['#7C3AED', '#2563EB', '#059669', '#D97706', '#DC2626', '#0891B2', '#DB2777', '#EA580C']
 
@@ -15,9 +18,13 @@ export default function Calisanlar() {
   const router = useRouter()
   const headerPad = useHeaderPad()
   const planFeatures = usePlanFeatures()
-  const [staff, setStaff] = useState<Staff[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
+  const { data: staff = [], isLoading: loading, refetch } = useQuery({
+    queryKey: queryKeys.staff(),
+    queryFn: () => api.staff.list(),
+    staleTime: 10 * 60 * 1000,
+  })
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Staff | null>(null)
   const [form, setForm] = useState({ name: '', title: '', email: '', phone: '', color: '#7C3AED', password: '' })
@@ -26,12 +33,6 @@ export default function Calisanlar() {
   const [search, setSearch] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    try { setStaff(await api.staff.list()) } catch {}
-    setLoading(false); setRefreshing(false)
-  }, [])
-
-  useEffect(() => { load() }, [load])
 
   function openCreate() {
     setEditing(null)
@@ -57,7 +58,7 @@ export default function Calisanlar() {
             setDeleting(st.id)
             try {
               await api.staff.delete(st.id)
-              setStaff(prev => prev.filter(s => s.id !== st.id))
+              queryClient.invalidateQueries({ queryKey: queryKeys.staff() })
             } catch {
               Alert.alert(t('error'), t('err_failed'))
             }
@@ -77,10 +78,10 @@ export default function Calisanlar() {
       const body = { name: form.name, title: form.title || undefined, email: form.email || undefined, phone: form.phone || undefined, color: form.color, ...(form.password ? { password: form.password } : {}) }
       if (editing) {
         const updated = await api.staff.update(editing.id, body)
-        setStaff(prev => prev.map(s => s.id === editing.id ? { ...s, ...updated } : s))
+        queryClient.invalidateQueries({ queryKey: queryKeys.staff() })
       } else {
         await api.staff.create(body)
-        load()
+        queryClient.invalidateQueries({ queryKey: queryKeys.staff() })
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
@@ -169,10 +170,10 @@ export default function Calisanlar() {
         )}
       </View>
 
-      {loading ? <View style={s.center}><ActivityIndicator color="#7C3AED" /></View> : (
+      {loading ? <SkeletonScreen rows={5} /> : (
         <ScrollView
           contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetch(); setRefreshing(false) }} tintColor="#7C3AED" />}
         >
           {activeStaff.length === 0 && inactiveStaff.length === 0 && (
             <Text style={s.empty}>{t('staff_empty')}</Text>

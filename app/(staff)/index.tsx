@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, Platform, Alert, ScrollView,
@@ -9,6 +9,9 @@ import * as Haptics from 'expo-haptics'
 import { secureStorage } from '@/lib/secureStorage'
 import { useRouter } from 'expo-router'
 import { staffApi, Appointment } from '@/lib/api'
+import { SkeletonScreen } from '@/components/SkeletonBox'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 import { useTranslation } from 'react-i18next'
 
 const STATUS_COLOR: Record<string, string> = {
@@ -40,8 +43,7 @@ export default function StaffAppointments() {
   const router = useRouter()
   const headerPad = useHeaderPad()
   const [staffData, setStaffData] = useState<{ name: string; staffId?: string } | null>(null)
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -53,22 +55,17 @@ export default function StaffAppointments() {
     })
   }, [])
 
-  const load = useCallback(async (date = selectedDate) => {
-    try {
-      const mine = await staffApi.appointments.list({ date })
-      setAppointments(mine)
-    } catch {}
-    setLoading(false)
-    setRefreshing(false)
-  }, [selectedDate, staffData])
-
-  useEffect(() => { load() }, [load])
+  const { data: appointments = [], isLoading: loading, refetch } = useQuery({
+    queryKey: queryKeys.staffAppointments(selectedDate),
+    queryFn: () => staffApi.appointments.list({ date: selectedDate }),
+    staleTime: 60 * 1000,
+  })
 
   async function handleStatusChange(apt: Appointment, status: string) {
     setUpdatingId(apt.id)
     try {
       const updated = await staffApi.appointments.update(apt.id, { status })
-      setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, ...updated } : a))
+      queryClient.invalidateQueries({ queryKey: queryKeys.staffAppointments(selectedDate) })
       setSelectedApt(prev => prev?.id === apt.id ? { ...prev, ...updated } : prev)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch { Alert.alert(t('error'), t('err_updateFailed')) }
@@ -143,8 +140,6 @@ export default function StaffAppointments() {
               onPress={() => {
                 Haptics.selectionAsync()
                 setSelectedDate(d.iso)
-                setLoading(true)
-                load(d.iso)
               }}
             >
               <Text style={[s.dateChipDay, selectedDate === d.iso && s.dateChipTxtActive]}>{d.dayName}</Text>
@@ -157,15 +152,13 @@ export default function StaffAppointments() {
       <View style={s.heroCurve} />
 
       {/* Liste */}
-      {loading ? (
-        <View style={s.center}><ActivityIndicator color="#7C3AED" size="large" /></View>
-      ) : (
+      {loading ? <SkeletonScreen rows={5} /> : (
         <FlatList
           data={appointments}
           keyExtractor={i => i.id}
           contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />
+            <RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetch(); setRefreshing(false) }} tintColor="#7C3AED" />
           }
           ListEmptyComponent={
             <View style={s.emptyWrap}>

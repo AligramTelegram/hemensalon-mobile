@@ -9,8 +9,11 @@ import { usePreferences } from '@/lib/usePreferences'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
-import { api, Appointment, Customer, Service, Staff, WaitingEntry } from '@/lib/api'
+import { api, Appointment, Customer, Service, Staff, WaitingEntry, getCachedTenant } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
+import { useRealtimeAppointments } from '@/lib/useRealtimeAppointments'
 
 const STATUS_COLOR: Record<string, string> = {
   BEKLIYOR: '#D97706', ONAYLANDI: '#2563EB',
@@ -43,12 +46,12 @@ export default function Appointments() {
   const router = useRouter()
   const headerPad = useHeaderPad()
   const { currencySymbol: symbol } = usePreferences()
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [services, setServices] = useState<Service[]>([])
-  const [staffList, setStaffList] = useState<Staff[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
+  const tenantId = getCachedTenant()?.id
+
+  // Realtime: başka cihazdan randevu eklenince otomatik güncelle
+  useRealtimeAppointments(tenantId)
   const [filterDate, setFilterDate] = useState(todayISO())
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [staffFilter, setStaffFilter] = useState('ALL')
@@ -61,8 +64,6 @@ export default function Appointments() {
   const updatingStatusIds = useRef<Set<string>>(new Set())
 
   const [mainTab, setMainTab] = useState<'randevular' | 'bekleme'>('randevular')
-  const [waitingList, setWaitingList] = useState<WaitingEntry[]>([])
-  const [waitingLoading, setWaitingLoading] = useState(false)
   const [showWaitingModal, setShowWaitingModal] = useState(false)
   const [waitingForm, setWaitingForm] = useState({ customerName: '', customerPhone: '', serviceName: '', preferredDate: '', preferredTime: '', notes: '' })
   const [savingWaiting, setSavingWaiting] = useState(false)
@@ -70,40 +71,46 @@ export default function Appointments() {
   const [weekStart, setWeekStart] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d
   })
-  const [weekApts, setWeekApts] = useState<Appointment[]>([])
-  const [monthApts, setMonthApts] = useState<Appointment[]>([])
   const [monthDate, setMonthDate] = useState(() => new Date())
 
-  const load = useCallback(async (date = filterDate) => {
-    try {
-      const apts = await api.appointments.list({ date })
-      setAppointments(apts)
-    } catch {}
-    setLoading(false)
-    setRefreshing(false)
-  }, [filterDate])
+  const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 
-  useEffect(() => {
-    load()
-    api.staff.list().then(setStaffList).catch(() => {})
-  }, [load])
+  const { data: appointments = [], isLoading: loading, refetch: refetchApts } = useQuery({
+    queryKey: queryKeys.appointments(filterDate),
+    queryFn: () => api.appointments.list({ date: filterDate }),
+    staleTime: 60 * 1000,
+  })
 
-  useEffect(() => {
-    if (viewMode !== 'calendar') return
-    const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-    const from = new Date(weekStart)
-    const to = new Date(weekStart); to.setDate(to.getDate() + 6)
-    api.appointments.list({ from: toISO(from), to: toISO(to) }).then(setWeekApts).catch(() => {})
-  }, [viewMode, weekStart])
+  const { data: staffList = [] } = useQuery({
+    queryKey: queryKeys.staff(),
+    queryFn: () => api.staff.list(),
+    staleTime: 10 * 60 * 1000,
+  })
 
-  useEffect(() => {
-    if (viewMode !== 'month') return
-    const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-    const year = monthDate.getFullYear(); const month = monthDate.getMonth()
-    const from = new Date(year, month, 1)
-    const to = new Date(year, month + 1, 0)
-    api.appointments.list({ from: toISO(from), to: toISO(to) }).then(setMonthApts).catch(() => {})
-  }, [viewMode, monthDate])
+  const { data: waitingList = [], isLoading: waitingLoading, refetch: refetchWaiting } = useQuery({
+    queryKey: queryKeys.waitingList(),
+    queryFn: () => api.waitingList.list(),
+    staleTime: 60 * 1000,
+    enabled: mainTab === 'bekleme',
+  })
+
+  const weekFrom = toISO(weekStart)
+  const weekTo = toISO(new Date(new Date(weekStart).setDate(weekStart.getDate() + 6)))
+  const { data: weekApts = [] } = useQuery({
+    queryKey: ['appointments', 'week', weekFrom, weekTo],
+    queryFn: () => api.appointments.list({ from: weekFrom, to: weekTo }),
+    staleTime: 60 * 1000,
+    enabled: viewMode === 'calendar',
+  })
+
+  const monthFrom = toISO(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1))
+  const monthTo = toISO(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0))
+  const { data: monthApts = [] } = useQuery({
+    queryKey: ['appointments', 'month', monthFrom, monthTo],
+    queryFn: () => api.appointments.list({ from: monthFrom, to: monthTo }),
+    staleTime: 60 * 1000,
+    enabled: viewMode === 'month',
+  })
 
   const filtered = appointments
     .filter(a => statusFilter === 'ALL' || a.status === statusFilter)
@@ -113,20 +120,18 @@ export default function Appointments() {
     ? staffList.filter(st => st.services.length === 0 || st.services.some(sv => sv.id === editForm.serviceId))
     : staffList
 
-  async function loadFormData() {
-    const [c, sv, st] = await Promise.all([api.customers.list(), api.services.list(), api.staff.list()])
-    setCustomers(c); setServices(sv); setStaffList(st)
-  }
+  const { data: customers = [] } = useQuery({
+    queryKey: queryKeys.customers(),
+    queryFn: () => api.customers.list(),
+    staleTime: 5 * 60 * 1000,
+  })
 
-  async function loadWaiting() {
-    setWaitingLoading(true)
-    try { setWaitingList(await api.waitingList.list()) } catch {}
-    setWaitingLoading(false)
-  }
+  const { data: services = [] } = useQuery({
+    queryKey: queryKeys.services(),
+    queryFn: () => api.services.list(),
+    staleTime: 10 * 60 * 1000,
+  })
 
-  useEffect(() => {
-    if (mainTab === 'bekleme') loadWaiting()
-  }, [mainTab])
 
   async function handleAddWaiting() {
     if (!waitingForm.customerName.trim() || !waitingForm.customerPhone.trim()) {
@@ -141,7 +146,7 @@ export default function Appointments() {
         preferredTime: waitingForm.preferredTime || undefined,
         notes: waitingForm.notes || undefined,
       })
-      setWaitingList(prev => [entry, ...prev])
+      queryClient.invalidateQueries({ queryKey: queryKeys.waitingList() })
       setShowWaitingModal(false)
       setWaitingForm({ customerName: '', customerPhone: '', serviceName: '', preferredDate: '', preferredTime: '', notes: '' })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
@@ -152,7 +157,7 @@ export default function Appointments() {
   async function handleWaitingStatus(id: string, status: 'BILDIRILDI' | 'IPTAL') {
     try {
       const updated = await api.waitingList.update(id, { status })
-      setWaitingList(prev => prev.map(w => w.id === id ? { ...w, ...updated } : w))
+      queryClient.invalidateQueries({ queryKey: queryKeys.waitingList() })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch { Alert.alert(t('error'), t('err_updateFailed')) }
   }
@@ -161,7 +166,7 @@ export default function Appointments() {
     Alert.alert(t('delete'), t('waiting_deleteConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.waitingList.delete(id); setWaitingList(prev => prev.filter(w => w.id !== id)) }
+        try { await api.waitingList.delete(id); queryClient.invalidateQueries({ queryKey: queryKeys.waitingList() }) }
         catch { Alert.alert(t('error'), t('err_deleteFailed')) }
       }},
     ])
@@ -184,7 +189,8 @@ export default function Appointments() {
         price: parseFloat(form.price), notes: form.notes || undefined,
       })
       setShowNew(false)
-      load(form.date)
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(form.date) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() })
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_createFailed')) }
     setSaving(false)
   }
@@ -194,7 +200,7 @@ export default function Appointments() {
     updatingStatusIds.current.add(id)
     try {
       const updated = await api.appointments.update(id, { status })
-      setAppointments(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a))
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(filterDate) })
       setDetailApt(prev => prev?.id === id ? { ...prev, ...updated } : prev)
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed')) }
     finally { updatingStatusIds.current.delete(id) }
@@ -240,7 +246,7 @@ export default function Appointments() {
         notes: editForm.notes || undefined,
       })
       setDetailApt(prev => prev ? { ...prev, ...updated } : prev)
-      setAppointments(prev => prev.map(a => a.id === detailApt.id ? { ...a, ...updated } : a))
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(filterDate) })
       setEditMode(false)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch (e: unknown) {
@@ -253,7 +259,7 @@ export default function Appointments() {
     try {
       await api.appointments.update(id, { paid })
       setDetailApt(prev => prev?.id === id ? { ...prev, paid } : prev)
-      setAppointments(prev => prev.map(a => a.id === id ? { ...a, paid } : a))
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(filterDate) })
       Haptics.selectionAsync()
     } catch { Alert.alert(t('error'), t('appointments_paymentUpdated')) }
   }
@@ -265,7 +271,7 @@ export default function Appointments() {
       { text: t('delete'), style: 'destructive', onPress: async () => {
         try {
           await api.appointments.update(id, { status: 'IPTAL' })
-          load()
+          queryClient.invalidateQueries({ queryKey: queryKeys.appointments(filterDate) })
           setDetailApt(null)
         } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},
@@ -487,7 +493,7 @@ export default function Appointments() {
           data={filtered}
           keyExtractor={i => i.id}
           contentContainerStyle={{ padding: 12, paddingBottom: 108 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetchApts(); setRefreshing(false) }} tintColor="#7C3AED" />}
           ListEmptyComponent={<Text style={s.empty}>{t('appointments_empty')}</Text>}
           renderItem={({ item }) => (
             <SwipeableRow

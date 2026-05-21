@@ -13,6 +13,9 @@ import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { api, DashboardStats, Product, Customer, PlanUsage } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
+import { useRealtimeAppointments } from '@/lib/useRealtimeAppointments'
 import { useTrial } from '@/lib/useTrial'
 import { useTranslation } from 'react-i18next'
 
@@ -42,14 +45,47 @@ export default function Dashboard() {
   const dockPad = useDockPad()
   const { currencySymbol: symbol } = usePreferences()
   const trial = useTrial()
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
+  const queryClient = useQueryClient()
   const [userName, setUserName] = useState('')
-  const [birthdayCustomers, setBirthdayCustomers] = useState<Customer[]>([])
-  const [usage, setUsage] = useState<PlanUsage | null>(null)
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
+
+  const { data: dashData, isLoading: loading, refetch: refetchDash } = useQuery({
+    queryKey: queryKeys.dashboard(),
+    queryFn: async () => {
+      const [data, { data: { user } }, products, usageData, notifs, readIdsRaw, allCustomers, tenantProfile] = await Promise.all([
+        api.dashboard.stats(),
+        supabase.auth.getUser(),
+        api.products.list().catch(() => [] as Product[]),
+        api.tenant.usage().catch(() => null),
+        api.notifications.list().catch(() => []),
+        AsyncStorage.getItem('read_notification_ids').catch(() => null),
+        api.customers.list().catch(() => [] as Customer[]),
+        api.tenant.get().catch(() => null),
+      ])
+      setUserName(tenantProfile?.name || (user?.email?.split('@')[0] ?? ''))
+      const readIds: Set<string> = readIdsRaw ? new Set(JSON.parse(readIdsRaw)) : new Set()
+      setUnreadNotifCount(notifs.filter((n: { isNew: boolean; id: string }) => n.isNew && !readIds.has(n.id)).length)
+      return { stats: data, usageData, lowStockProducts: products.filter((p: Product) => p.isActive && p.quantity <= p.minQuantity), birthdayCustomers: allCustomers.filter((c: Customer) => {
+        if (!c.birthday) return false
+        const today = new Date()
+        const bd = new Date(c.birthday)
+        const thisYear = new Date(today.getFullYear(), bd.getMonth(), bd.getDate())
+        const diff = (thisYear.getTime() - today.getTime()) / 86400000
+        return diff >= 0 && diff <= 7
+      }), tenantProfile }
+    },
+    staleTime: 2 * 60 * 1000,
+  })
+
+  const stats = dashData?.stats ?? null
+  const usage = dashData?.usageData ?? null
+  const lowStockProducts = dashData?.lowStockProducts ?? []
+  const birthdayCustomers = dashData?.birthdayCustomers ?? []
+
+  // Yeni randevu gelince otomatik güncelle
+  useRealtimeAppointments(dashData?.tenantProfile?.id)
+
+  const [refreshing, setRefreshing] = useState(false)
   const [showFabMenu, setShowFabMenu] = useState(false)
   const [autoRefreshing, setAutoRefreshing] = useState(false)
   const fabAnim = useRef(new Animated.Value(0)).current
@@ -94,71 +130,24 @@ export default function Dashboard() {
     Animated.spring(fabAnim, { toValue: 0, useNativeDriver: true, tension: 200, friction: 15 }).start()
   }
 
-  const load = useCallback(async () => {
-    try {
-      const [data, { data: { user } }, products, usageData, notifs, readIdsRaw, allCustomers, tenantProfile] = await Promise.all([
-        api.dashboard.stats(),
-        supabase.auth.getUser(),
-        api.products.list().catch(() => [] as Product[]),
-        api.tenant.usage().catch(() => null),
-        api.notifications.list().catch(() => []),
-        AsyncStorage.getItem('read_notification_ids').catch(() => null),
-        api.customers.list().catch(() => [] as Customer[]),
-        api.tenant.get().catch(() => null),
-      ])
-      setStats(data)
-      setUsage(usageData)
-      setUserName(tenantProfile?.name || (user?.email?.split('@')[0] ?? ''))
-      setLowStockProducts(products.filter(p => p.isActive && p.quantity <= p.minQuantity))
-      const readIds: Set<string> = readIdsRaw ? new Set(JSON.parse(readIdsRaw)) : new Set()
-      setUnreadNotifCount(notifs.filter(n => n.isNew && !readIds.has(n.id)).length)
-
-      const today = new Date()
-      const upcoming = allCustomers.filter(c => {
-        if (!c.birthday) return false
-        const bd = new Date(c.birthday)
-        const thisYear = new Date(today.getFullYear(), bd.getMonth(), bd.getDate())
-        const diff = (thisYear.getTime() - today.getTime()) / 86400000
-        return diff >= 0 && diff <= 7
-      })
-      setBirthdayCustomers(upcoming)
-      lastLoadedAt.current = Date.now()
-    } catch (e: unknown) {
-      console.warn('Failed to load dashboard', e)
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
-    }
-    setLoading(false)
-    setRefreshing(false)
-  }, [t])
-
-  useEffect(() => { load() }, [load])
+  // Sayfaya odaklanınca cache süresi dolduysa otomatik yenile
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(), refetchType: 'active' })
+    }, [queryClient])
+  )
 
   // 1 dakikada bir otomatik yenile
   useEffect(() => {
     const interval = setInterval(async () => {
       setAutoRefreshing(true)
       startSpinAnim()
-      await load()
+      await refetchDash()
       setAutoRefreshing(false)
       stopSpinAnim()
     }, 60 * 1000)
     return () => clearInterval(interval)
-  }, [load, startSpinAnim, stopSpinAnim])
-
-  // Sayfaya odaklanınca yenile — ama son yüklemeden 30 saniye geçmediyse atlat
-  const FOCUS_STALE_MS = 30_000
-  useFocusEffect(
-    useCallback(() => {
-      if (!loading && Date.now() - lastLoadedAt.current > FOCUS_STALE_MS) {
-        setAutoRefreshing(true)
-        startSpinAnim()
-        load().then(() => {
-          setAutoRefreshing(false)
-          stopSpinAnim()
-        })
-      }
-    }, [load, loading, startSpinAnim, stopSpinAnim])
-  )
+  }, [refetchDash, startSpinAnim, stopSpinAnim])
 
   async function openNotifications() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -225,7 +214,7 @@ export default function Dashboard() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); load() }}
+            onRefresh={async () => { setRefreshing(true); await refetchDash(); setRefreshing(false) }}
             tintColor="rgba(255,255,255,0.9)"
             colors={['#7C3AED']}
             progressBackgroundColor="#fff"

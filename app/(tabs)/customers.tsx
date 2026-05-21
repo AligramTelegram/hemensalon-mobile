@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Modal, TextInput, Alert, RefreshControl, ActivityIndicator,
@@ -9,6 +9,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { api, Customer, PlanLimitError } from '@/lib/api'
+import { SkeletonScreen } from '@/components/SkeletonBox'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 import { useTranslation } from 'react-i18next'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
@@ -36,8 +39,7 @@ export default function Customers() {
   const { t } = useTranslation()
   const router = useRouter()
   const headerPad = useHeaderPad()
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('name')
@@ -50,29 +52,25 @@ export default function Customers() {
   const [photoUris, setPhotoUris] = useState<Record<string, string>>({})
   const [pendingPhoto, setPendingPhoto] = useState<string | null>(null)
 
-  const load = useCallback(async (q?: string) => {
-    try {
-      setCustomers(await api.customers.list(q))
-    } catch (e: unknown) {
-      console.warn('Failed to load customers', e)
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
-    }
-    setLoading(false); setRefreshing(false)
-  }, [t])
-
-  useEffect(() => { load() }, [load])
+  const { data: customers = [], isLoading: loading, refetch: refetchCustomers } = useQuery({
+    queryKey: queryKeys.customers(),
+    queryFn: () => api.customers.list(),
+    staleTime: 5 * 60 * 1000,
+  })
 
   useEffect(() => {
     AsyncStorage.getItem('customer_photos').then(raw => {
       if (raw) setPhotoUris(JSON.parse(raw))
     }).catch(() => {})
   }, [])
-  useEffect(() => {
-    const t = setTimeout(() => load(search || undefined), 350)
-    return () => clearTimeout(t)
-  }, [search, load])
 
-  const segmented = segment === 'ALL' ? customers : customers.filter(c => {
+  const searched = useMemo(() =>
+    search.trim()
+      ? customers.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search))
+      : customers
+  , [customers, search])
+
+  const segmented = segment === 'ALL' ? searched : searched.filter(c => {
     const tag = getTag(c)
     return tag?.key === segment
   })
@@ -144,12 +142,12 @@ export default function Customers() {
     try {
       if (editing) {
         const updated = await api.customers.update(editing.id, payload)
-        setCustomers(prev => prev.map(c => c.id === editing.id ? { ...c, ...updated } : c))
+        queryClient.invalidateQueries({ queryKey: queryKeys.customers() })
         await savePhoto(editing.id, pendingPhoto)
       } else {
         const created = await api.customers.create(payload)
         if (pendingPhoto) await savePhoto(created.id, pendingPhoto)
-        load()
+        queryClient.invalidateQueries({ queryKey: queryKeys.customers() })
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
@@ -202,7 +200,7 @@ export default function Customers() {
     Alert.alert(t('customer_deleteTitle'), t('confirm_delete', { name: c.name }), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.customers.delete(c.id); setCustomers(prev => prev.filter(x => x.id !== c.id)) }
+        try { await api.customers.delete(c.id); queryClient.invalidateQueries({ queryKey: queryKeys.customers() }) }
         catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},
     ])
@@ -284,14 +282,12 @@ export default function Customers() {
         </ScrollView>
       </View>
 
-      {loading ? (
-        <View style={s.center}><ActivityIndicator color="#7C3AED" /></View>
-      ) : (
+      {loading ? <SkeletonScreen rows={8} /> : (
         <FlatList
           data={sorted}
           keyExtractor={i => i.id}
           contentContainerStyle={{ padding: 12, paddingBottom: 108 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(search || undefined) }} tintColor="#7C3AED" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetchCustomers(); setRefreshing(false) }} tintColor="#7C3AED" />}
           ListEmptyComponent={<Text style={s.empty}>{t('customer_empty')}</Text>}
           renderItem={({ item }) => {
             const tag = getTag(item)

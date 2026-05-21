@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, ActivityIndicator, ScrollView, Platform } from 'react-native'
+import { useState } from 'react'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, ActivityIndicator, ScrollView, Platform, StyleProp, ViewStyle } from 'react-native'
+import { SkeletonScreen } from '@/components/SkeletonBox'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useDockPad } from '@/lib/useDockPad'
@@ -8,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, Service } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 
 const COLORS = ['#7C3AED', '#2563EB', '#059669', '#D97706', '#DC2626', '#0891B2', '#DB2777', '#EA580C']
 
@@ -24,9 +27,13 @@ export default function Hizmetler() {
   const dockPad = useDockPad()
   const { currencySymbol } = usePreferences()
   const router = useRouter()
-  const [services, setServices] = useState<Service[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
+  const { data: services = [], isLoading: loading, refetch } = useQuery({
+    queryKey: queryKeys.services(),
+    queryFn: () => api.services.list(),
+    staleTime: 10 * 60 * 1000,
+  })
 
   // Service modal
   const [showSvcModal, setShowSvcModal] = useState(false)
@@ -34,18 +41,6 @@ export default function Hizmetler() {
   const [svcForm, setSvcForm] = useState({ name: '', description: '', duration: '60', price: '', color: '#7C3AED' })
   const [savingSvc, setSavingSvc] = useState(false)
 
-  const load = useCallback(async () => {
-    try {
-      const svcs = await api.services.list()
-      setServices(svcs)
-    } catch (e: unknown) {
-      console.warn('Failed to load services', e)
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
-    }
-    setLoading(false); setRefreshing(false)
-  }, [t])
-
-  useEffect(() => { load() }, [load])
 
   // ── Service handlers ──────────────────────────────────────────────────────
 
@@ -68,10 +63,10 @@ export default function Hizmetler() {
       const body = { name: svcForm.name, description: svcForm.description || undefined, duration: parseInt(svcForm.duration), price: parseFloat(svcForm.price), color: svcForm.color }
       if (editingSvc) {
         const updated = await api.services.update(editingSvc.id, body)
-        setServices(prev => prev.map(s => s.id === editingSvc.id ? { ...s, ...updated } : s))
+        queryClient.invalidateQueries({ queryKey: queryKeys.services() })
       } else {
         await api.services.create(body)
-        load()
+        queryClient.invalidateQueries({ queryKey: queryKeys.services() })
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowSvcModal(false)
@@ -86,7 +81,7 @@ export default function Hizmetler() {
     Alert.alert(t('hizmet_deleteTitle'), t('confirm_delete', { name: sv.name }), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.services.delete(sv.id); setServices(prev => prev.filter(x => x.id !== sv.id)) }
+        try { await api.services.delete(sv.id); queryClient.invalidateQueries({ queryKey: queryKeys.services() }) }
         catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},
     ])
@@ -95,7 +90,7 @@ export default function Hizmetler() {
   async function toggleActiveSvc(sv: Service) {
     try {
       const updated = await api.services.update(sv.id, { isActive: !sv.isActive })
-      setServices(prev => prev.map(x => x.id === sv.id ? { ...x, ...updated } : x))
+      queryClient.invalidateQueries({ queryKey: queryKeys.services() })
     } catch {}
   }
 
@@ -120,12 +115,12 @@ export default function Hizmetler() {
       </View>
       <View style={s.headerCurve} />
 
-      {loading ? <View style={s.center}><ActivityIndicator color="#7C3AED" /></View> : (
+      {loading ? <SkeletonScreen rows={6} /> : (
         <FlatList
           data={services}
           keyExtractor={i => i.id}
           contentContainerStyle={{ padding: 12, paddingBottom: dockPad }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetch(); setRefreshing(false) }} tintColor="#7C3AED" />}
           ListEmptyComponent={<Text style={s.empty}>{t('hizmetler_empty')}</Text>}
           renderItem={({ item }) => (
             <View style={[s.card, !item.isActive && s.cardInactive]}>
