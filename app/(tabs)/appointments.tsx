@@ -9,11 +9,10 @@ import { usePreferences } from '@/lib/usePreferences'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
-import { api, Appointment, Customer, Service, Staff, WaitingEntry, getCachedTenant } from '@/lib/api'
+import { api, Appointment, Customer, Service, Staff, WaitingEntry } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
-import { useRealtimeAppointments } from '@/lib/useRealtimeAppointments'
 
 const STATUS_COLOR: Record<string, string> = {
   BEKLIYOR: '#D97706', ONAYLANDI: '#2563EB',
@@ -48,10 +47,6 @@ export default function Appointments() {
   const { currencySymbol: symbol } = usePreferences()
   const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
-  const tenantId = getCachedTenant()?.id
-
-  // Realtime: başka cihazdan randevu eklenince otomatik güncelle
-  useRealtimeAppointments(tenantId)
   const [filterDate, setFilterDate] = useState(todayISO())
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [staffFilter, setStaffFilter] = useState('ALL')

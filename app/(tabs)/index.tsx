@@ -15,7 +15,6 @@ import { api, DashboardStats, Product, Customer, PlanUsage } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
-import { useRealtimeAppointments } from '@/lib/useRealtimeAppointments'
 import { useTrial } from '@/lib/useTrial'
 import { useTranslation } from 'react-i18next'
 
@@ -82,9 +81,6 @@ export default function Dashboard() {
   const lowStockProducts = dashData?.lowStockProducts ?? []
   const birthdayCustomers = dashData?.birthdayCustomers ?? []
 
-  // Yeni randevu gelince otomatik güncelle
-  useRealtimeAppointments(dashData?.tenantProfile?.id)
-
   const [refreshing, setRefreshing] = useState(false)
   const [showFabMenu, setShowFabMenu] = useState(false)
   const [autoRefreshing, setAutoRefreshing] = useState(false)
@@ -133,7 +129,7 @@ export default function Dashboard() {
   // Sayfaya odaklanınca cache süresi dolduysa otomatik yenile
   useFocusEffect(
     useCallback(() => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(), refetchType: 'active' })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(), refetchType: 'none' })
     }, [queryClient])
   )
 
