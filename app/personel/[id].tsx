@@ -45,7 +45,7 @@ export default function PersonelDetay() {
     { label: t('day_mon'), day: 1 }, { label: t('day_tue'), day: 2 },
     { label: t('day_wed'), day: 3 }, { label: t('day_thu'), day: 4 },
     { label: t('day_fri'), day: 5 }, { label: t('day_sat'), day: 6 },
-    { label: t('day_sun'), day: 7 },
+    { label: t('day_sun'), day: 0 },
   ]
 
   const [staff, setStaff] = useState<StaffDetail | null>(null)
@@ -76,6 +76,11 @@ export default function PersonelDetay() {
       const data = await api.staffDetail.get(id)
       setStaff(data)
       if (data.commissionRate != null) setCommissionRate(String(data.commissionRate))
+      if (data.workHours?.length) {
+        setWorkDays(data.workHours.filter(w => w.isWorking).map(w => w.dayOfWeek))
+        setStartTime(data.workHours[0].startTime)
+        setEndTime(data.workHours[0].endTime)
+      }
     } catch {
       Alert.alert(t('error'), t('personel_load_failed')); router.back()
     }

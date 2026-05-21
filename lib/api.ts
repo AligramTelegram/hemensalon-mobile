@@ -363,6 +363,7 @@ export type Leave = {
 
 export type StaffDetail = Staff & {
   commissionRate?: number
+  workHours: { dayOfWeek: number; startTime: string; endTime: string; isWorking: boolean }[]
   appointments: {
     id: string; date: string; startTime: string; status: string; price: number
     customer: { name: string }
