@@ -130,11 +130,13 @@ export default function Dashboard() {
     Animated.spring(fabAnim, { toValue: 0, useNativeDriver: true, tension: 200, friction: 15 }).start()
   }
 
-  // Sekmeye odaklanınca stale veri varsa yenile
+  // Sekmeye odaklanınca sadece stale veri varsa yenile (prefetch'i bozmamak için)
   useFocusEffect(
     useCallback(() => {
       if (!tenantId) return
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
+      const state = queryClient.getQueryState(queryKeys.dashboard(tenantId))
+      const isStale = !state || Date.now() - (state.dataUpdatedAt ?? 0) > 30 * 1000
+      if (isStale) queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
     }, [tenantId, queryClient])
   )
 

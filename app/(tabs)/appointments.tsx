@@ -83,7 +83,10 @@ export default function Appointments() {
   useFocusEffect(
     useCallback(() => {
       if (!tenantId) return
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
+      const key = queryKeys.appointments(tenantId, filterDate)
+      const state = queryClient.getQueryState(key)
+      const isStale = !state || Date.now() - (state.dataUpdatedAt ?? 0) > 30 * 1000
+      if (isStale) queryClient.invalidateQueries({ queryKey: key })
     }, [tenantId, filterDate, queryClient])
   )
 
