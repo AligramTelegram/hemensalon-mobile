@@ -34,11 +34,15 @@ async function dbSelect(table: string, params: Record<string, string>): Promise<
 }
 
 async function dbInsert(table: string, body: Record<string, unknown>): Promise<void> {
-  await fetch(`${REST}/${table}`, {
+  const res = await fetch(`${REST}/${table}`, {
     method:  'POST',
     headers: { ...HEADERS, 'Prefer': 'return=minimal' },
     body:    JSON.stringify(body),
   })
+  if (!res.ok) {
+    const err = await res.text().catch(() => '')
+    throw new Error(`INSERT ${table}: ${res.status} ${err}`)
+  }
 }
 
 async function dbUpdate(table: string, id: string, body: Record<string, unknown>): Promise<void> {
@@ -226,16 +230,19 @@ function buildEmailHtml(opts: { customerName: string; serviceName: string; date:
 
 function pad(n: number) { return n.toString().padStart(2,'0') }
 
-async function alreadySent(appointmentId: string, channel: string, label: string): Promise<boolean> {
-  const rows = await dbSelect('notifications', {
-    select:        'id',
-    appointmentId: `eq.${appointmentId}`,
-    channel:       `eq.${channel}`,
-    status:        `eq.GONDERILDI`,
-    message:       `ilike.%${label}%`,
-    limit:         '1',
-  }).catch(() => [])
-  return rows.length > 0
+// reminderTag: "REMINDER_24H" veya "REMINDER_1H" — ASCII, ilike yok, kesin eşleşme
+async function alreadySent(appointmentId: string, channel: string, reminderTag: string): Promise<boolean> {
+  const url = new URL(`${REST}/notifications`)
+  url.searchParams.set('select', 'id')
+  url.searchParams.set('appointmentId', `eq.${appointmentId}`)
+  url.searchParams.set('channel', `eq.${channel}`)
+  url.searchParams.set('status', 'eq.GONDERILDI')
+  url.searchParams.set('message', `eq.${reminderTag}`)
+  url.searchParams.set('limit', '1')
+  const res = await fetch(url.toString(), { headers: HEADERS }).catch(() => null)
+  if (!res || !res.ok) return false
+  const rows = await res.json().catch(() => [])
+  return Array.isArray(rows) && rows.length > 0
 }
 
 // ── Pencere işleme ────────────────────────────────────────────────────────────
@@ -243,42 +250,37 @@ async function alreadySent(appointmentId: string, channel: string, label: string
 async function processWindow(label: string, hoursAhead: number, reminderField: string) {
   const now      = new Date()
   const localNow = new Date(now.getTime() + 3 * 60 * 60 * 1000)  // UTC+3
+  const reminderTag = hoursAhead === 24 ? 'REMINDER_24H' : 'REMINDER_1H'
 
-  let dateGte: string, dateLte: string
+  let dateStr: string
   let timeFrom: string | null = null, timeTo: string | null = null
 
   if (hoursAhead === 24) {
     const tom = new Date(localNow); tom.setDate(tom.getDate() + 1)
-    const ds  = tom.toISOString().split('T')[0]
-    dateGte   = `${ds}T00:00:00.000Z`
-    dateLte   = `${ds}T23:59:59.999Z`
+    dateStr = tom.toISOString().split('T')[0]
   } else {
-    const ds  = localNow.toISOString().split('T')[0]
-    dateGte   = `${ds}T00:00:00.000Z`
-    dateLte   = `${ds}T23:59:59.999Z`
-    const f   = new Date(localNow.getTime() + 30 * 60 * 1000)
-    const t   = new Date(localNow.getTime() + 90 * 60 * 1000)
-    timeFrom  = `${pad(f.getHours())}:${pad(f.getMinutes())}`
-    timeTo    = `${pad(t.getHours())}:${pad(t.getMinutes())}`
+    dateStr = localNow.toISOString().split('T')[0]
+    const f = new Date(localNow.getTime() + 30 * 60 * 1000)
+    const t = new Date(localNow.getTime() + 90 * 60 * 1000)
+    timeFrom = `${pad(f.getHours())}:${pad(f.getMinutes())}`
+    timeTo   = `${pad(t.getHours())}:${pad(t.getMinutes())}`
   }
 
+  // PostgREST: iki filtre için and() kullan — duplicate key problemi yok
   let appointments: Record<string, unknown>[]
   try {
-    appointments = await dbSelect('appointments', {
-      select: 'id,date,startTime,tenantId,customerId,serviceId',
-      status: 'in.(BEKLIYOR,ONAYLANDI)',
-      date:   `gte.${dateGte}`,
-      'date': `lte.${dateLte}`,
-    }) as Record<string, unknown>[]
+    const url = new URL(`${REST}/appointments`)
+    url.searchParams.set('select', 'id,date,startTime,tenantId,customerId,serviceId')
+    url.searchParams.set('status', 'in.(BEKLIYOR,ONAYLANDI)')
+    url.searchParams.set('and', `(date.gte.${dateStr}T00:00:00.000Z,date.lte.${dateStr}T23:59:59.999Z)`)
+    const res = await fetch(url.toString(), { headers: HEADERS })
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`)
+    appointments = await res.json()
   } catch (e) {
     return { smsSent: 0, emailSent: 0, errors: [`DB hatası [${label}]: ${String(e)}`] }
   }
 
-  // date filtresi ikisi aynı key'de mümkün olmadığından SQLden dönen sonuçları filtrele
-  const filteredByDate = appointments.filter(a => {
-    const d = a.date as string
-    return d >= dateGte && d <= dateLte
-  })
+  const filteredByDate = appointments
 
   let smsSent = 0, emailSent = 0
   const errors: string[] = []
@@ -311,15 +313,14 @@ async function processWindow(label: string, hoursAhead: number, reminderField: s
       id:     `eq.${appt.serviceId}`,
     }).catch(() => []) as Record<string, unknown>[]
 
-    const msgLabel = `${label} öncesi`
-    const isTR     = (tenant.country as string) === 'TR'
+    const isTR = (tenant.country as string) === 'TR'
 
     // SMS
     if (isTR && customer.phone) {
-      const sent = await alreadySent(appt.id as string, 'SMS', msgLabel)
+      const sent = await alreadySent(appt.id as string, 'SMS', reminderTag)
       if (!sent) {
-        const planLimits: Record<string, number> = { BASLANGIC: 100, PROFESYONEL: 300, ISLETME: 1000 }
-        const limit    = planLimits[tenant.plan as string] ?? 100
+        const planLimits: Record<string, number> = { BASLANGIC: 200, PROFESYONEL: 600, ISLETME: 1600 }
+        const limit    = planLimits[tenant.plan as string] ?? 200
         const hasCredit = (tenant.smsUsed as number) < limit || (tenant.smsCredits as number) > 0
 
         if (hasCredit) {
@@ -336,7 +337,7 @@ async function processWindow(label: string, hoursAhead: number, reminderField: s
 
           await dbInsert('notifications', {
             tenantId: appt.tenantId, appointmentId: appt.id, channel: 'SMS',
-            to: customer.phone, message: `${msgLabel} SMS hatırlatma`,
+            to: customer.phone, message: reminderTag,
             status: res.success ? 'GONDERILDI' : 'BASARISIZ',
             sentAt: res.success ? new Date().toISOString() : undefined,
             errorMessage: res.error,
@@ -347,7 +348,7 @@ async function processWindow(label: string, hoursAhead: number, reminderField: s
 
     // Email
     if (customer.email) {
-      const sent = await alreadySent(appt.id as string, 'EMAIL', msgLabel)
+      const sent = await alreadySent(appt.id as string, 'EMAIL', reminderTag)
       if (!sent) {
         const subject = `📅 Randevu Hatırlatması — ${formatDate(appt.date as string)} ${appt.startTime}`
         const html = buildEmailHtml({
@@ -362,7 +363,7 @@ async function processWindow(label: string, hoursAhead: number, reminderField: s
         if (res.success) { emailSent++ } else { errors.push(`Email [${appt.id}]: ${res.error}`) }
         await dbInsert('notifications', {
           tenantId: appt.tenantId, appointmentId: appt.id, channel: 'EMAIL',
-          to: customer.email, message: `${msgLabel} email hatırlatma`,
+          to: customer.email, message: reminderTag,
           status: res.success ? 'GONDERILDI' : 'BASARISIZ',
           sentAt: res.success ? new Date().toISOString() : undefined,
           errorMessage: res.error,

@@ -124,7 +124,7 @@ export default function Login() {
           await secureStorage.setItem('session_expires_at', (expiresAt * 1000).toString())
         }
       }
-      // Tenant bilgisini al ve kritik verileri önceden yükle
+      // Tenant bilgisini al — staff hesabı ise engelle
       try {
         const tenant = await api.tenant.get()
         const tid = tenant.id
@@ -134,7 +134,20 @@ export default function Login() {
           queryClient.prefetchQuery({ queryKey: queryKeys.dashboard(tid), queryFn: () => api.dashboard.stats(), staleTime: 60 * 1000 }),
           queryClient.prefetchQuery({ queryKey: queryKeys.appointments(tid, todayStr), queryFn: () => api.appointments.list({ date: todayStr }), staleTime: 60 * 1000 }),
         ])
-      } catch { /* prefetch başarısız olsa bile devam et */ }
+      } catch (e: unknown) {
+        if (e instanceof Error && e.message.includes('STAFF_ACCOUNT')) {
+          await supabase.auth.signOut()
+          await secureStorage.removeItem('mobile_token')
+          setLoading(false)
+          Alert.alert(
+            t('auth_staff_title'),
+            t('auth_staff_msg'),
+            [{ text: t('ok') }]
+          )
+          return
+        }
+        // Diğer prefetch hatalarında devam et
+      }
       setLoading(false)
       router.replace('/(tabs)')
     } else {

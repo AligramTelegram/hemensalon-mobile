@@ -195,7 +195,7 @@ export default function Appointments() {
         price: parseFloat(form.price), notes: form.notes || undefined,
       })
       setShowNew(false)
-      queryClient.invalidateQueries({ queryKey: ['appointments', tenantId] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_createFailed')) }
     setSaving(false)

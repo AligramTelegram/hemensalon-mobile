@@ -217,7 +217,7 @@ export default function YeniRandevu() {
       })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       // Tüm tarihler ve dashboard anında güncellenir
-      queryClient.invalidateQueries({ queryKey: ['appointments', tenantId] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
 
       try {

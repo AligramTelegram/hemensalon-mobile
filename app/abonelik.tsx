@@ -25,6 +25,7 @@ type PlanDef = {
   featureKeys: string[]
   missingKeys: string[]
   smsKey: string
+  mailKey: string
   popular?: boolean
 }
 
@@ -38,6 +39,7 @@ const PLANS: PlanDef[] = [
     featureKeys: ['plan_BASLANGIC_f1', 'plan_BASLANGIC_f2', 'plan_BASLANGIC_f3', 'plan_BASLANGIC_f4'],
     missingKeys: ['plan_BASLANGIC_m1', 'plan_BASLANGIC_m2', 'plan_BASLANGIC_m3', 'plan_BASLANGIC_m4'],
     smsKey: 'plan_BASLANGIC_sms',
+    mailKey: 'plan_mail_unlimited',
   },
   {
     key: 'PROFESYONEL',
@@ -46,9 +48,10 @@ const PLANS: PlanDef[] = [
     bg: '#EDE9FE',
     icon: 'flash-outline',
     popular: true,
-    featureKeys: ['plan_PROFESYONEL_f1', 'plan_PROFESYONEL_f2', 'plan_PROFESYONEL_f3', 'plan_PROFESYONEL_f4', 'plan_PROFESYONEL_f5', 'plan_PROFESYONEL_f6'],
+    featureKeys: ['plan_PROFESYONEL_f1', 'plan_PROFESYONEL_f2', 'plan_PROFESYONEL_f3', 'plan_PROFESYONEL_f4', 'plan_PROFESYONEL_f5'],
     missingKeys: ['plan_PROFESYONEL_m1', 'plan_PROFESYONEL_m2'],
     smsKey: 'plan_PROFESYONEL_sms',
+    mailKey: 'plan_mail_unlimited',
   },
   {
     key: 'ISLETME',
@@ -59,6 +62,7 @@ const PLANS: PlanDef[] = [
     featureKeys: ['plan_ISLETME_f1', 'plan_ISLETME_f2', 'plan_ISLETME_f3', 'plan_ISLETME_f4', 'plan_ISLETME_f5', 'plan_ISLETME_f6'],
     missingKeys: [],
     smsKey: 'plan_ISLETME_sms',
+    mailKey: 'plan_mail_unlimited',
   },
 ]
 
@@ -307,10 +311,15 @@ async function handleUpgrade(planKey: string) {
                       <Text style={s.featureTxt}>{t(fk)}</Text>
                     </View>
                   ))}
-                  {profile?.isTurkish && (
+                  {profile?.isTurkish ? (
                     <View style={s.featureRow}>
                       <Ionicons name="checkmark-circle" size={17} color="#22C55E" />
                       <Text style={s.featureTxt}>{t(plan.smsKey)}</Text>
+                    </View>
+                  ) : (
+                    <View style={s.featureRow}>
+                      <Ionicons name="checkmark-circle" size={17} color="#22C55E" />
+                      <Text style={s.featureTxt}>{t(plan.mailKey)}</Text>
                     </View>
                   )}
                 </View>

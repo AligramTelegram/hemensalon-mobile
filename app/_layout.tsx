@@ -177,8 +177,8 @@ export default function RootLayout() {
         const updated = [newEntry, ...list].slice(0, 50)
         await AsyncStorage.setItem(PUSH_NOTIFS_KEY, JSON.stringify(updated))
         // Randevu ve dashboard cache'ini anında geçersiz kıl
-        queryClient.invalidateQueries({ queryKey: ['appointments'] })
-        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+        queryClient.invalidateQueries({ queryKey: ['appointments'], exact: false })
+        queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false })
       } catch {}
     })
 

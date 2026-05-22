@@ -46,7 +46,7 @@ export default function Finans() {
   useFocusEffect(
     useCallback(() => {
       if (!tenantId) return
-      queryClient.invalidateQueries({ queryKey: ['transactions', tenantId] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId) })
     }, [tenantId, queryClient])
   )
 
@@ -104,7 +104,7 @@ export default function Finans() {
       })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
-      queryClient.invalidateQueries({ queryKey: ['transactions', tenantId] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId) })
     } catch (e: unknown) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))
@@ -116,7 +116,7 @@ export default function Finans() {
     Alert.alert(t('finans_deleteTitle'), t('finans_deleteConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.transactions.delete(tx.id); queryClient.invalidateQueries({ queryKey: ['transactions', tenantId] }) }
+        try { await api.transactions.delete(tx.id); queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId) }) }
         catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},
     ])
@@ -190,7 +190,7 @@ export default function Finans() {
   async function markPaid(apt: Appointment) {
     try {
       await api.appointments.update(apt.id, { paid: true })
-      queryClient.invalidateQueries({ queryKey: ['transactions', tenantId] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId) })
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_updateFailed')) }
   }
 

@@ -179,6 +179,7 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   const data = await res.json().catch(() => null)
   if (!res.ok) {
     console.warn(`API PATCH failed: ${BASE}${path}`, res.status, data)
+    if (res.status === 402 || res.status === 403) throw new PlanLimitError(data?.error ?? 'Plan limiti aşıldı')
     throw new Error(data?.error ?? `PATCH ${path} → ${res.status}`)
   }
   return data

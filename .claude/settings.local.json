@@ -103,7 +103,13 @@
       "Bash(git remote *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\muham\\\\Desktop\\\\salonapy-v2\\\\src\" -Recurse -Directory)",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(Sort-Object)"
+      "Bash(Sort-Object)",
+      "Bash(npx supabase *)",
+      "Bash(supabase functions *)",
+      "Bash(dir /s /b \"C:\\\\Users\\\\muham\\\\Desktop\\\\hemensalon-mobile\\\\supabase\")",
+      "PowerShell($token = Get-Content \"C:\\\\Users\\\\muham\\\\AppData\\\\Roaming\\\\supabase\\\\access-token\" -ErrorAction SilentlyContinue; if \\($token\\) { Write-Output \"Token found: $\\($token.Substring\\(0,10\\)\\)...\" } else { Write-Output \"No token found\" })",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\muham\\\\Desktop\\\\salonapy-v2\\\\src\" -Directory)",
+      "Bash(Select-Object Name)"
     ],
     "additionalDirectories": [
       "C:\\Users\\muham\\Desktop\\salonapy-v2\\src",
