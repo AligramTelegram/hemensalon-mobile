@@ -104,10 +104,16 @@ export default function Login() {
 
     if (mode === 'login') {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) { setLoading(false); Alert.alert(t('auth_loginError'), error.message); return }
+      if (error) {
+        await supabase.auth.signOut().catch(() => {})
+        setLoading(false)
+        Alert.alert(t('auth_loginError'), t('auth_invalidCredentials'))
+        return
+      }
 
-      // E-posta doğrulaması kontrolü
-      if (!data.user?.email_confirmed_at) {
+      // E-posta doğrulaması kontrolü (Supabase bazen confirmed ama alan boş dönüyor — confirmed_at veya identities ile kontrol et)
+      const isConfirmed = !!data.user?.email_confirmed_at || !!data.user?.confirmed_at
+      if (!isConfirmed) {
         await supabase.auth.signOut()
         setLoading(false)
         setMode('verify_email')
