@@ -290,6 +290,14 @@ export type StaffRevenue = {
   revenue: number
 }
 
+export type PaginatedResponse<T> = {
+  data: T[]
+  total: number
+  page: number
+  limit: number
+  hasMore: boolean
+}
+
 export type TransactionStats = {
   revenue: number
   expense: number
@@ -429,6 +437,25 @@ export type ReminderSettings = {
   remind2h: boolean
 }
 
+export type DashboardNotif = {
+  id: string
+  customerName: string
+  serviceName: string
+  status: string
+  statusLabel: string
+  startTime: string
+  isNew: boolean
+}
+
+export type DashboardFull = {
+  stats: DashboardStats
+  tenant: TenantProfile
+  usage: PlanUsage
+  lowStockProducts: Product[]
+  birthdayCustomers: Customer[]
+  notifications: DashboardNotif[]
+}
+
 export type PlanUsage = {
   plan: string
   appointmentsThisMonth: number
@@ -473,6 +500,7 @@ export type TenantProfile = {
 
 // ── Staff Portal API (uses real Supabase JWT via x-mobile-token) ───────────
 export const staffApi = {
+  dashboard: (date?: string) => get<{ appointments: Appointment[]; staff: { id: string; name: string; email: string; avatarUrl?: string; title?: string; color: string } }>('/api/staff/dashboard', date ? { date } : undefined),
   appointments: {
     list: (params?: Record<string, string>) => get<Appointment[]>('/api/staff/appointments', params),
     update: (id: string, body: Partial<{ status: string; paid: boolean }>) =>
@@ -482,14 +510,17 @@ export const staffApi = {
     list: (q?: string) => get<Customer[]>('/api/staff/customers', q ? { q } : undefined),
   },
   services: {
-    list: () => get<Service[]>('/api/services?all=true'),
+    list: () => get<Service[]>('/api/staff/services'),
   },
   me: () => get<{ id: string; name: string; phone?: string; title?: string; color: string; tenant: { name: string; slug: string } }>('/api/staff/me'),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    post<{ success: boolean }>('/api/staff/change-password', { currentPassword, newPassword }),
 }
 
 export const api = {
   dashboard: {
     stats: () => get<DashboardStats>('/api/dashboard/stats'),
+    full: () => get<DashboardFull>('/api/dashboard/full'),
   },
   appointments: {
     list: (params?: Record<string, string>) => get<Appointment[]>('/api/appointments', params),
@@ -501,7 +532,8 @@ export const api = {
       put<Appointment>(`/api/appointments/${id}`, body),
   },
   customers: {
-    list: (q?: string) => get<Customer[]>('/api/customers', q ? { q } : undefined),
+    list: (params?: { q?: string; page?: number; limit?: number }) =>
+      get<PaginatedResponse<Customer>>('/api/customers', params ? Object.fromEntries(Object.entries(params).filter(([,v]) => v !== undefined).map(([k,v]) => [k, String(v)])) : undefined),
     get: (id: string) => get<Customer>(`/api/customers/${id}`),
     create: (body: { name: string; phone: string; email?: string; notes?: string; birthday?: string }) =>
       post<Customer>('/api/customers', body),
@@ -527,7 +559,8 @@ export const api = {
     delete: (id: string) => del(`/api/services/${id}`),
   },
   transactions: {
-    list: (period?: string) => get<Transaction[]>('/api/transactions', period ? { period } : undefined),
+    list: (params?: { period?: string; page?: number; limit?: number }) =>
+      get<PaginatedResponse<Transaction>>('/api/transactions', params ? Object.fromEntries(Object.entries(params).filter(([,v]) => v !== undefined).map(([k,v]) => [k, String(v)])) : undefined),
     stats: (period?: string) => get<TransactionStats>('/api/transactions/stats', period ? { period } : undefined),
     create: (body: { type: 'GELIR' | 'GIDER'; amount: number; category: string; description?: string; date: string; paymentMethod?: string; isDebt?: boolean }) =>
       post<Transaction>('/api/transactions', body),
@@ -568,7 +601,7 @@ export const api = {
   },
   workingHours: {
     list: () => get<WorkingHour[]>('/api/working-hours'),
-    update: (hours: WorkingHour[]) => put<WorkingHour[]>('/api/working-hours', { hours }),
+    update: (hours: WorkingHour[]) => put<WorkingHour[]>('/api/working-hours', hours),
   },
   campaigns: {
     list: () => get<Campaign[]>('/api/campaigns'),

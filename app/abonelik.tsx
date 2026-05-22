@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Linking, Alert, Platform, Switch,
+  RefreshControl, ActivityIndicator, Linking, Alert, Platform,
 } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter } from 'expo-router'
@@ -128,7 +128,7 @@ async function handleUpgrade(planKey: string) {
         t('sub_change_plan_msg', { label: planLabel }),
         [
           { text: t('cancel'), style: 'cancel' },
-          { text: t('ok'), style: 'cancel' },
+          { text: t('ok'), style: 'default' },
         ]
       )
     }

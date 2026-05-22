@@ -11,8 +11,7 @@ import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { api, DashboardStats, Product, Customer, PlanUsage } from '@/lib/api'
-import { supabase } from '@/lib/supabase'
+import { api, DashboardFull } from '@/lib/api'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
 import { useTenantId } from '@/lib/useTenantId'
@@ -53,35 +52,22 @@ export default function Dashboard() {
   const { data: dashData, isLoading: loading, refetch: refetchDash } = useQuery({
     queryKey: queryKeys.dashboard(tenantId),
     enabled: !!tenantId,
-    refetchInterval: 60 * 1000,
+    refetchInterval: 30 * 1000,
     queryFn: async () => {
-      const [data, { data: { user } }, products, usageData, notifs, readIdsRaw, allCustomers, tenantProfile] = await Promise.all([
-        api.dashboard.stats(),
-        supabase.auth.getUser(),
-        api.products.list().catch(() => [] as Product[]),
-        api.tenant.usage().catch(() => null),
-        api.notifications.list().catch(() => []),
+      const [full, readIdsRaw] = await Promise.all([
+        api.dashboard.full(),
         AsyncStorage.getItem('read_notification_ids').catch(() => null),
-        api.customers.list().catch(() => [] as Customer[]),
-        api.tenant.get().catch(() => null),
       ])
-      setUserName(tenantProfile?.name || (user?.email?.split('@')[0] ?? ''))
+      setUserName(full.tenant?.name ?? '')
       const readIds: Set<string> = readIdsRaw ? new Set(JSON.parse(readIdsRaw)) : new Set()
-      setUnreadNotifCount(notifs.filter((n: { isNew: boolean; id: string }) => n.isNew && !readIds.has(n.id)).length)
-      return { stats: data, usageData, lowStockProducts: products.filter((p: Product) => p.isActive && p.quantity <= p.minQuantity), birthdayCustomers: allCustomers.filter((c: Customer) => {
-        if (!c.birthday) return false
-        const today = new Date()
-        const bd = new Date(c.birthday)
-        const thisYear = new Date(today.getFullYear(), bd.getMonth(), bd.getDate())
-        const diff = (thisYear.getTime() - today.getTime()) / 86400000
-        return diff >= 0 && diff <= 7
-      }), tenantProfile }
+      setUnreadNotifCount(full.notifications.filter(n => n.isNew && !readIds.has(n.id)).length)
+      return full
     },
-    staleTime: 60 * 1000,
+    staleTime: 20 * 1000,
   })
 
   const stats = dashData?.stats ?? null
-  const usage = dashData?.usageData ?? null
+  const usage = dashData?.usage ?? null
   const lowStockProducts = dashData?.lowStockProducts ?? []
   const birthdayCustomers = dashData?.birthdayCustomers ?? []
 
@@ -130,13 +116,11 @@ export default function Dashboard() {
     Animated.spring(fabAnim, { toValue: 0, useNativeDriver: true, tension: 200, friction: 15 }).start()
   }
 
-  // Sekmeye odaklanınca sadece stale veri varsa yenile (prefetch'i bozmamak için)
+  // Her sayfadan döndüğünde arka planda sessizce yenile
   useFocusEffect(
     useCallback(() => {
       if (!tenantId) return
-      const state = queryClient.getQueryState(queryKeys.dashboard(tenantId))
-      const isStale = !state || Date.now() - (state.dataUpdatedAt ?? 0) > 30 * 1000
-      if (isStale) queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
     }, [tenantId, queryClient])
   )
 
@@ -206,7 +190,7 @@ export default function Dashboard() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={async () => { setRefreshing(true); await refetchDash(); setRefreshing(false) }}
-            tintColor="rgba(255,255,255,0.9)"
+            tintColor="#7C3AED"
             colors={['#7C3AED']}
             progressBackgroundColor="#fff"
           />
@@ -924,9 +908,9 @@ const s = StyleSheet.create({
   newDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: PURPLE },
   notifService: { fontSize: 13, color: '#6B7280', marginBottom: 6 },
   notifTime: { fontSize: 11, color: '#9CA3AF' },
-  fab: { position: 'absolute', bottom: Platform.OS === 'ios' ? 114 : 100, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#7C3AED', justifyContent: 'center', alignItems: 'center', shadowColor: '#7C3AED', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8, zIndex: 100 },
+  fab: { position: 'absolute', bottom: Platform.OS === 'ios' ? 140 : 124, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#7C3AED', justifyContent: 'center', alignItems: 'center', shadowColor: '#7C3AED', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8, zIndex: 100 },
   fabBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90 },
-  fabOption: { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 114 : 100, zIndex: 95 },
+  fabOption: { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 140 : 124, zIndex: 95 },
   fabOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'flex-end' },
   fabOptionIcon: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, elevation: 4 },
   fabOptionTxt: { fontSize: 13, fontWeight: '700', color: '#111827', backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },

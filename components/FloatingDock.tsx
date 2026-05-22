@@ -17,12 +17,10 @@ type TabConfig = {
 }
 
 const TAB_DEFS: TabConfig[] = [
-  { name: 'index',        route: '/(tabs)',              icon: 'home',          iconOutline: 'home-outline',         color: '#7C3AED' },
-  { name: 'appointments', route: '/(tabs)/appointments', icon: 'calendar',      iconOutline: 'calendar-outline',     color: '#2563EB' },
-  { name: 'customers',    route: '/(tabs)/customers',    icon: 'people',        iconOutline: 'people-outline',       color: '#059669' },
-  { name: 'calisanlar',   route: '/calisanlar',          icon: 'person-circle', iconOutline: 'person-circle-outline',color: '#0891B2' },
-  { name: 'hizmetler',    route: '/hizmetler',           icon: 'cut',           iconOutline: 'cut-outline',          color: '#D97706' },
-  { name: 'menu',         route: '/(tabs)/menu',         icon: 'grid',          iconOutline: 'grid-outline',         color: '#EA580C' },
+  { name: 'index',        route: '/(tabs)',              icon: 'home',     iconOutline: 'home-outline',     color: '#7C3AED' },
+  { name: 'appointments', route: '/(tabs)/appointments', icon: 'calendar', iconOutline: 'calendar-outline', color: '#2563EB' },
+  { name: 'customers',    route: '/(tabs)/customers',    icon: 'people',   iconOutline: 'people-outline',   color: '#059669' },
+  { name: 'menu',         route: '/(tabs)/menu',         icon: 'grid',     iconOutline: 'grid-outline',     color: '#EA580C' },
 ]
 
 const DOCK_VISIBLE_SCREENS = [

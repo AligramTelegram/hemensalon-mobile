@@ -49,18 +49,27 @@ export default function StaffAppointments() {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [selectedApt, setSelectedApt] = useState<Appointment | null>(null)
 
+  const [hasStaffToken, setHasStaffToken] = useState<boolean | null>(null)
+
   useEffect(() => {
-    secureStorage.getItem('staff_data').then(raw => {
+    Promise.all([
+      secureStorage.getItem('staff_data'),
+      secureStorage.getItem('staff_token'),
+    ]).then(([raw, token]) => {
       if (raw) setStaffData(JSON.parse(raw))
+      setHasStaffToken(!!token)
     })
   }, [])
 
-  const { data: appointments = [], isLoading: loading, refetch } = useQuery({
+  const { data: dashData, isLoading: loading, refetch } = useQuery({
     queryKey: queryKeys.staffAppointments('staff', selectedDate),
-    queryFn: () => staffApi.appointments.list({ date: selectedDate }),
+    queryFn: () => staffApi.dashboard(selectedDate),
+    enabled: hasStaffToken === true,
     staleTime: 30 * 1000,
     refetchInterval: 60 * 1000,
   })
+
+  const appointments = dashData?.appointments ?? []
 
   useFocusEffect(
     useCallback(() => {

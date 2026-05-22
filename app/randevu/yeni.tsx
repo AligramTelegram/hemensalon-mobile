@@ -93,12 +93,13 @@ export default function YeniRandevu() {
 
   const days = nextWeekDays(14, t('today'), t('tomorrow'))
 
-  const { data: customers = [], isLoading: loadingCustomers } = useQuery({
+  const { data: customersRes, isLoading: loadingCustomers } = useQuery({
     queryKey: queryKeys.customers(tenantId),
     queryFn: () => api.customers.list(),
     staleTime: 2 * 60 * 1000,
     enabled: !!tenantId,
   })
+  const customers = customersRes?.data ?? []
 
   const { data: servicesRaw = [], isLoading: loadingServices } = useQuery({
     queryKey: queryKeys.services(tenantId),

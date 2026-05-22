@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, RefreshControl, ActivityIndicator, Platform,
-  ScrollView, Modal,
+  ScrollView, Modal, Linking,
 } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { Ionicons } from '@expo/vector-icons'
@@ -185,7 +185,12 @@ export default function StaffMusteriler() {
               </View>
               <View style={{ flex: 1, marginLeft: 14 }}>
                 <Text style={s.modalName}>{selectedCustomer.name}</Text>
-                <Text style={s.modalPhone}>{selectedCustomer.phone}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={s.modalPhone}>{selectedCustomer.phone}</Text>
+                  <TouchableOpacity onPress={() => Linking.openURL(`tel:${selectedCustomer.phone}`)} style={s.callBtn}>
+                    <Ionicons name="call" size={13} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               </View>
               <TouchableOpacity style={s.closeBtn} onPress={() => setSelectedCustomer(null)}>
                 <Ionicons name="close" size={18} color="#6B7280" />
@@ -337,6 +342,7 @@ const s = StyleSheet.create({
   modalName: { fontSize: 18, fontWeight: '800', color: '#111827' },
   modalPhone: { fontSize: 13, color: '#6B7280', marginTop: 2 },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  callBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#059669', justifyContent: 'center', alignItems: 'center' },
 
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 14, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },

@@ -152,7 +152,7 @@ export default function AramaScreen() {
 
     try {
       const [cust, apts, svcs] = await Promise.all([
-        api.customers.list(q).catch(() => [] as Customer[]),
+        api.customers.list({ q }).then(r => r.data).catch(() => [] as Customer[]),
         api.appointments.list({ q }).catch(() => [] as Appointment[]),
         api.services.list().catch(() => [] as Service[]),
       ])

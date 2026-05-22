@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useFocusEffect } from 'expo-router'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { api, Customer, PlanLimitError } from '@/lib/api'
 import { SkeletonScreen } from '@/components/SkeletonBox'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
 import { useTenantId } from '@/lib/useTenantId'
 import { useTranslation } from 'react-i18next'
@@ -55,12 +55,32 @@ export default function Customers() {
   const [photoUris, setPhotoUris] = useState<Record<string, string>>({})
   const [pendingPhoto, setPendingPhoto] = useState<string | null>(null)
 
-  const { data: customers = [], isLoading: loading, refetch: refetchCustomers } = useQuery({
-    queryKey: queryKeys.customers(tenantId),
-    queryFn: () => api.customers.list(),
+  const debouncedSearch = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [debouncedQ, setDebouncedQ] = useState('')
+
+  useEffect(() => {
+    if (debouncedSearch.current) clearTimeout(debouncedSearch.current)
+    debouncedSearch.current = setTimeout(() => setDebouncedQ(search.trim()), 300)
+    return () => { if (debouncedSearch.current) clearTimeout(debouncedSearch.current) }
+  }, [search])
+
+  const {
+    data: customerPages,
+    isLoading: loading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch: refetchCustomers,
+  } = useInfiniteQuery({
+    queryKey: [...queryKeys.customers(tenantId), debouncedQ],
+    queryFn: ({ pageParam = 1 }) => api.customers.list({ q: debouncedQ || undefined, page: pageParam, limit: 50 }),
+    getNextPageParam: (last) => last.hasMore ? last.page + 1 : undefined,
+    initialPageParam: 1,
     staleTime: 2 * 60 * 1000,
     enabled: !!tenantId,
   })
+
+  const customers = useMemo(() => customerPages?.pages.flatMap(p => p.data) ?? [], [customerPages])
 
   useFocusEffect(
     useCallback(() => {
@@ -75,11 +95,8 @@ export default function Customers() {
     }).catch(() => {})
   }, [])
 
-  const searched = useMemo(() =>
-    search.trim()
-      ? customers.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search))
-      : customers
-  , [customers, search])
+  // Arama backend'de yapılıyor — customers zaten filtrelenmiş geliyor
+  const searched = customers
 
   const segmented = segment === 'ALL' ? searched : searched.filter(c => {
     const tag = getTag(c)
@@ -300,6 +317,9 @@ export default function Customers() {
           contentContainerStyle={{ padding: 12, paddingBottom: 108 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetchCustomers(); setRefreshing(false) }} tintColor="#7C3AED" />}
           ListEmptyComponent={<Text style={s.empty}>{t('customer_empty')}</Text>}
+          onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage() }}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color="#7C3AED" style={{ marginVertical: 16 }} /> : null}
           renderItem={({ item }) => {
             const tag = getTag(item)
             return (

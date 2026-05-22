@@ -9,7 +9,7 @@ import { usePreferences } from '@/lib/usePreferences'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
-import { api, Appointment, Customer, Service, Staff, WaitingEntry } from '@/lib/api'
+import { api, Appointment, Customer, Service, Staff } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
@@ -61,10 +61,6 @@ export default function Appointments() {
   const [saving, setSaving] = useState(false)
   const updatingStatusIds = useRef<Set<string>>(new Set())
 
-  const [mainTab, setMainTab] = useState<'randevular' | 'bekleme'>('randevular')
-  const [showWaitingModal, setShowWaitingModal] = useState(false)
-  const [waitingForm, setWaitingForm] = useState({ customerName: '', customerPhone: '', serviceName: '', preferredDate: '', preferredTime: '', notes: '' })
-  const [savingWaiting, setSavingWaiting] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'month'>('list')
   const [weekStart, setWeekStart] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d
@@ -96,14 +92,7 @@ export default function Appointments() {
     staleTime: 10 * 60 * 1000,
   })
 
-  const { data: waitingList = [], isLoading: waitingLoading, refetch: refetchWaiting } = useQuery({
-    queryKey: queryKeys.waitingList(tenantId),
-    queryFn: () => api.waitingList.list(),
-    staleTime: 60 * 1000,
-    enabled: mainTab === 'bekleme',
-  })
-
-  const weekFrom = toISO(weekStart)
+const weekFrom = toISO(weekStart)
   const weekTo = toISO(new Date(new Date(weekStart).setDate(weekStart.getDate() + 6)))
   const { data: weekApts = [] } = useQuery({
     queryKey: ['appointments', tenantId, 'week', weekFrom, weekTo],
@@ -129,11 +118,12 @@ export default function Appointments() {
     ? staffList.filter(st => st.services.length === 0 || st.services.some(sv => sv.id === editForm.serviceId))
     : staffList
 
-  const { data: customers = [] } = useQuery({
+  const { data: customersRes } = useQuery({
     queryKey: queryKeys.customers(tenantId),
     queryFn: () => api.customers.list(),
     staleTime: 5 * 60 * 1000,
   })
+  const customers = customersRes?.data ?? []
 
   const { data: services = [] } = useQuery({
     queryKey: queryKeys.services(tenantId),
@@ -141,45 +131,6 @@ export default function Appointments() {
     staleTime: 10 * 60 * 1000,
   })
 
-
-  async function handleAddWaiting() {
-    if (!waitingForm.customerName.trim() || !waitingForm.customerPhone.trim()) {
-      Alert.alert(t('warning'), t('waiting_nameRequired')); return
-    }
-    setSavingWaiting(true)
-    try {
-      const entry = await api.waitingList.create({
-        customerName: waitingForm.customerName.trim(),
-        customerPhone: waitingForm.customerPhone.trim(),
-        preferredDate: waitingForm.preferredDate || undefined,
-        preferredTime: waitingForm.preferredTime || undefined,
-        notes: waitingForm.notes || undefined,
-      })
-      queryClient.invalidateQueries({ queryKey: queryKeys.waitingList(tenantId) })
-      setShowWaitingModal(false)
-      setWaitingForm({ customerName: '', customerPhone: '', serviceName: '', preferredDate: '', preferredTime: '', notes: '' })
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-    } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_createFailed')) }
-    setSavingWaiting(false)
-  }
-
-  async function handleWaitingStatus(id: string, status: 'BILDIRILDI' | 'IPTAL') {
-    try {
-      const updated = await api.waitingList.update(id, { status })
-      queryClient.invalidateQueries({ queryKey: queryKeys.waitingList(tenantId) })
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-    } catch { Alert.alert(t('error'), t('err_updateFailed')) }
-  }
-
-  async function handleDeleteWaiting(id: string) {
-    Alert.alert(t('delete'), t('waiting_deleteConfirm'), [
-      { text: t('cancel'), style: 'cancel' },
-      { text: t('delete'), style: 'destructive', onPress: async () => {
-        try { await api.waitingList.delete(id); queryClient.invalidateQueries({ queryKey: queryKeys.waitingList(tenantId) }) }
-        catch { Alert.alert(t('error'), t('err_deleteFailed')) }
-      }},
-    ])
-  }
 
   function openNew() {
     router.push(`/randevu/yeni?date=${filterDate}` as never)
@@ -327,18 +278,6 @@ export default function Appointments() {
         <Text style={s.heroTitle}>{t('appointments')}</Text>
         <Text style={s.heroSub}>{t('appointments_listed', { count: appointments.length })}</Text>
 
-        {/* Ana sekme */}
-        <View style={s.mainTabBar}>
-          <TouchableOpacity style={[s.mainTab, mainTab === 'randevular' && s.mainTabActive]} onPress={() => { Haptics.selectionAsync(); setMainTab('randevular') }}>
-            <Text style={[s.mainTabTxt, mainTab === 'randevular' && s.mainTabTxtActive]}>{t('appointments_tab')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.mainTab, mainTab === 'bekleme' && s.mainTabActive]} onPress={() => { Haptics.selectionAsync(); setMainTab('bekleme') }}>
-            <Text style={[s.mainTabTxt, mainTab === 'bekleme' && s.mainTabTxtActive]}>{t('appointments_tab_waiting')}</Text>
-            {waitingList.filter(w => w.status === 'BEKLIYOR').length > 0 && (
-              <View style={s.mainTabBadge}><Text style={s.mainTabBadgeTxt}>{waitingList.filter(w => w.status === 'BEKLIYOR').length}</Text></View>
-            )}
-          </TouchableOpacity>
-        </View>
       </View>
       <View style={s.heroCurve} />
 
@@ -390,101 +329,7 @@ export default function Appointments() {
         </View>
       )}
 
-      {mainTab === 'bekleme' ? (
-        <>
-          {waitingLoading ? (
-            <View style={s.center}><ActivityIndicator color="#7C3AED" /></View>
-          ) : (
-            <FlatList
-              data={waitingList}
-              keyExtractor={i => i.id}
-              contentContainerStyle={{ padding: 12, paddingBottom: 108 }}
-              ListEmptyComponent={
-                <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-                  <Ionicons name="hourglass-outline" size={48} color="#E5E7EB" />
-                  <Text style={{ color: '#9CA3AF', marginTop: 12, fontSize: 14 }}>{t('waiting_empty')}</Text>
-                </View>
-              }
-              renderItem={({ item }) => {
-                const statusColor = item.status === 'BEKLIYOR' ? '#D97706' : item.status === 'BILDIRILDI' ? '#059669' : '#6B7280'
-                const statusBg = item.status === 'BEKLIYOR' ? '#FFFBEB' : item.status === 'BILDIRILDI' ? '#ECFDF5' : '#F9FAFB'
-                const statusLabel = t(item.status === 'BEKLIYOR' ? 'status_BEKLIYOR' : item.status === 'BILDIRILDI' ? 'status_BILDIRILDI' : 'status_IPTAL')
-                return (
-                  <View style={s.waitRow}>
-                    <View style={s.waitLeft}>
-                      <View style={s.waitAvatar}><Text style={s.waitAvatarTxt}>{item.customerName.charAt(0).toUpperCase()}</Text></View>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={s.waitName}>{item.customerName}</Text>
-                        <View style={[s.badge, { backgroundColor: statusBg }]}>
-                          <Text style={[s.badgeTxt, { color: statusColor }]}>{statusLabel}</Text>
-                        </View>
-                      </View>
-                      <Text style={s.waitPhone}>{item.customerPhone}</Text>
-                      {(item.preferredDate || item.preferredTime) && (
-                        <Text style={s.waitMeta}>
-                          {[item.preferredDate, item.preferredTime].filter(Boolean).join(' · ')}
-                        </Text>
-                      )}
-                      {item.notes && <Text style={s.waitNote}>{item.notes}</Text>}
-                      {item.status === 'BEKLIYOR' && (
-                        <View style={s.waitActions}>
-                          <TouchableOpacity style={s.waitActionBtn} onPress={() => handleWaitingStatus(item.id, 'BILDIRILDI')}>
-                            <Ionicons name="checkmark-circle-outline" size={14} color="#059669" />
-                            <Text style={[s.waitActionTxt, { color: '#059669' }]}>{t('waiting_notify')}</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity style={[s.waitActionBtn, { backgroundColor: '#EFF6FF' }]} onPress={() => router.push(`/randevu/yeni` as never)}>
-                            <Ionicons name="calendar-outline" size={14} color="#2563EB" />
-                            <Text style={[s.waitActionTxt, { color: '#2563EB' }]}>{t('waiting_bookAppointment')}</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => handleDeleteWaiting(item.id)} style={s.waitDeleteBtn}>
-                            <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                )
-              }}
-            />
-          )}
-
-          {/* Bekleme listesi ekle butonu */}
-          <TouchableOpacity style={s.waitAddFab} onPress={() => setShowWaitingModal(true)}>
-            <Ionicons name="add" size={24} color="#fff" />
-          </TouchableOpacity>
-
-          {/* Bekleme listesi modal */}
-          <Modal visible={showWaitingModal} animationType="slide" presentationStyle="pageSheet">
-            <View style={s.modal}>
-              <ModalHeader title={t('waiting_add')} onClose={() => setShowWaitingModal(false)} />
-              <ScrollView style={s.modalBody} keyboardShouldPersistTaps="handled">
-                <Label>{t('waiting_nameSurname')}</Label>
-                <TextInput style={s.input} value={waitingForm.customerName} onChangeText={v => setWaitingForm(f => ({ ...f, customerName: v }))} placeholder={t('name')} placeholderTextColor="#9CA3AF" />
-                <Label>{t('waiting_phone')}</Label>
-                <TextInput style={s.input} value={waitingForm.customerPhone} onChangeText={v => setWaitingForm(f => ({ ...f, customerPhone: v }))} placeholder="05XX XXX XX XX" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" />
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Label>{t('waiting_prefDate')}</Label>
-                    <TextInput style={s.input} value={waitingForm.preferredDate} onChangeText={v => setWaitingForm(f => ({ ...f, preferredDate: v }))} placeholder="YYYY-MM-DD" placeholderTextColor="#9CA3AF" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Label>{t('waiting_prefTime')}</Label>
-                    <TextInput style={s.input} value={waitingForm.preferredTime} onChangeText={v => setWaitingForm(f => ({ ...f, preferredTime: v }))} placeholder="10:00" placeholderTextColor="#9CA3AF" />
-                  </View>
-                </View>
-                <Label>{t('waiting_note')}</Label>
-                <TextInput style={[s.input, { height: 80 }]} value={waitingForm.notes} onChangeText={v => setWaitingForm(f => ({ ...f, notes: v }))} multiline placeholder={t('optional')} placeholderTextColor="#9CA3AF" />
-                <TouchableOpacity style={s.saveBtn} onPress={handleAddWaiting} disabled={savingWaiting}>
-                  {savingWaiting ? <ActivityIndicator color="#fff" /> : <Text style={s.saveTxt}>{t('waiting_addToList')}</Text>}
-                </TouchableOpacity>
-                <View style={{ height: 40 }} />
-              </ScrollView>
-            </View>
-          </Modal>
-        </>
-      ) : loading ? (
+      {loading ? (
         <View style={s.center}><ActivityIndicator color="#7C3AED" /></View>
       ) : viewMode === 'month' ? (
         <MonthlyCalendar
@@ -826,8 +671,8 @@ const s = StyleSheet.create({
   paidTxt: { fontSize: 14, fontWeight: '700' },
   gelirBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#059669', borderRadius: 12, padding: 14, marginBottom: 12 },
   gelirTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  staffChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
-  staffChipActive: { borderColor: '#7C3AED', backgroundColor: '#F5F3FF' },
+  staffChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F3F4F6' },
+  staffChipActive: { borderColor: '#7C3AED', backgroundColor: '#7C3AED' },
   staffDot: { width: 6, height: 6, borderRadius: 3 },
 
   mainTabBar: { flexDirection: 'row', gap: 8, marginTop: 16 },

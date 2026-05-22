@@ -63,6 +63,8 @@ export default function StaffLayout() {
 
   useEffect(() => { refreshBadge() }, [refreshBadge])
 
+  useFocusEffect(useCallback(() => { refreshBadge() }, [refreshBadge]))
+
   return (
     <Tabs
       screenOptions={{

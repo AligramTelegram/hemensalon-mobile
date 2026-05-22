@@ -5,7 +5,7 @@ import { SplashAnimation } from '@/components/SplashAnimation';
 import { detectCountry } from '@/lib/pricing';
 import { initI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
-import { View, ActivityIndicator, I18nManager } from 'react-native';
+import { View, ActivityIndicator, I18nManager, Platform } from 'react-native';
 import { isRTL } from '@/lib/i18n';
 import * as Notifications from 'expo-notifications';
 import { api, getCachedTenant, setCachedTenant } from '@/lib/api';
@@ -92,7 +92,7 @@ export default function RootLayout() {
       const isExpired = expiresAtStr
         ? Date.now() > parseInt(expiresAtStr, 10)
         : loginTimeStr
-          ? Date.now() - parseInt(loginTimeStr, 10) > 24 * 60 * 60 * 1000
+          ? Date.now() - parseInt(loginTimeStr, 10) > 12 * 60 * 60 * 1000
           : false
       if (isExpired) {
         await supabase.auth.signOut()
@@ -105,8 +105,17 @@ export default function RootLayout() {
       }
 
       // Supabase session kontrolü
-      const { data: { session: s } } = await supabase.auth.getSession();
-      setSession(s);
+      const { data: { session: s }, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr || (s && !s.refresh_token)) {
+        await supabase.auth.signOut()
+        await secureStorage.removeItem('mobile_token')
+        await secureStorage.removeItem('refresh_token')
+        await secureStorage.removeItem('login_time')
+        await secureStorage.removeItem('session_expires_at')
+        setSession(null)
+      } else {
+        setSession(s);
+      }
 
       // Staff token kontrolü
       const st = await secureStorage.getItem('staff_token');
@@ -183,9 +192,17 @@ export default function RootLayout() {
     })
 
     const sub = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'TOKEN_REFRESHED' && !s) {
+        // Refresh token geçersiz — oturumu temizle
+        supabase.auth.signOut()
+        secureStorage.removeItem('mobile_token')
+        secureStorage.removeItem('refresh_token')
+        secureStorage.removeItem('login_time')
+        secureStorage.removeItem('session_expires_at')
+        setSession(null)
+        return
+      }
       setSession(s);
-      // Sadece aktif çıkış yapıldığında staff verilerini temizle
-      // INITIAL_SESSION event'inde temizleme — staff mobile_token ile giriş yaptıysa silinmesin
       if (event === 'SIGNED_OUT') {
         secureStorage.removeItem('staff_token');
         secureStorage.removeItem('staff_data');
@@ -270,10 +287,19 @@ export default function RootLayout() {
           }
         } catch (e) {
           console.warn('Route guard access check failed:', e)
-          // 401 = token geçersiz → oturumu temizle ve login'e yönlendir
-          if (e instanceof Error && (e.message.includes('Yetkisiz') || e.message.includes('401'))) {
-            await supabase.auth.signOut()
-            router.replace('/(auth)/login')
+          if (e instanceof Error) {
+            // Staff hesabı owner girişi denedi — çıkış yap, login'e gönder
+            if (e.message.includes('STAFF_ACCOUNT')) {
+              await supabase.auth.signOut()
+              await secureStorage.removeItem('mobile_token')
+              router.replace('/(auth)/login')
+              return
+            }
+            // 401 = token geçersiz → oturumu temizle ve login'e yönlendir
+            if (e.message.includes('Yetkisiz') || e.message.includes('401')) {
+              await supabase.auth.signOut()
+              router.replace('/(auth)/login')
+            }
           }
         }
       }
@@ -293,11 +319,15 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
     <SafeAreaProvider>
     <ThemeProvider>
-      <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 150 }}>
-        <Stack.Screen name="(auth)/login" />
-        <Stack.Screen name="(auth)/onboarding" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="(staff)" />
+      <Stack screenOptions={{
+        headerShown: false,
+        animation: Platform.OS === 'ios' ? 'slide_from_right' : 'fade_from_bottom',
+        animationDuration: Platform.OS === 'ios' ? 320 : 220,
+      }}>
+        <Stack.Screen name="(auth)/login" options={{ animation: 'fade', animationDuration: 250 }} />
+        <Stack.Screen name="(auth)/onboarding" options={{ animation: 'fade', animationDuration: 250 }} />
+        <Stack.Screen name="(tabs)" options={{ animation: 'fade', animationDuration: 200 }} />
+        <Stack.Screen name="(staff)" options={{ animation: 'fade', animationDuration: 200 }} />
         <Stack.Screen name="hizmetler" />
         <Stack.Screen name="calisanlar" />
         <Stack.Screen name="finans" />
@@ -307,13 +337,13 @@ export default function RootLayout() {
         <Stack.Screen name="paketler" />
         <Stack.Screen name="abonelik" />
         <Stack.Screen name="musteri/[id]" />
-        <Stack.Screen name="randevu/yeni" options={{ animation: 'slide_from_bottom', animationDuration: 200 }} />
+        <Stack.Screen name="randevu/yeni" options={{ animation: 'slide_from_bottom', animationDuration: 280 }} />
         <Stack.Screen name="kampanya" />
         <Stack.Screen name="personel/[id]" />
         <Stack.Screen name="promosyon" />
         <Stack.Screen name="bildirimler" />
-        <Stack.Screen name="arama" />
-        <Stack.Screen name="deneme-bitti" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="arama" options={{ animation: 'fade', animationDuration: 200 }} />
+        <Stack.Screen name="deneme-bitti" options={{ gestureEnabled: false, animation: 'fade' }} />
       </Stack>
       <FloatingDock />
       {!splashDone && <SplashAnimation onFinish={() => setSplashDone(true)} />}

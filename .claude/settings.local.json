@@ -109,7 +109,13 @@
       "Bash(dir /s /b \"C:\\\\Users\\\\muham\\\\Desktop\\\\hemensalon-mobile\\\\supabase\")",
       "PowerShell($token = Get-Content \"C:\\\\Users\\\\muham\\\\AppData\\\\Roaming\\\\supabase\\\\access-token\" -ErrorAction SilentlyContinue; if \\($token\\) { Write-Output \"Token found: $\\($token.Substring\\(0,10\\)\\)...\" } else { Write-Output \"No token found\" })",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\muham\\\\Desktop\\\\salonapy-v2\\\\src\" -Directory)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "Bash(curl -s \"https://salonapy-v2-production.up.railway.app/api/health\")",
+      "Bash(curl -s -o /dev/null -w \"%{time_total}\" \"https://salonapy-v2-production.up.railway.app/api/health\")",
+      "Bash(npx next *)",
+      "Bash(for f *)",
+      "Read(//c/Users/muham/Desktop/salonapy-v2/src/app/api/cron$f/**)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\muham\\\\Desktop\\\\salonapy-v2\\\\src\\\\app\\\\api\\\\cron\" -Recurse -Filter \"route.ts\" | ForEach-Object { Write-Host \"=== $\\($_.Directory.Name\\) ===\"; Get-Content $_.FullName | Select-Object -First 8; Write-Host \"\" })"
     ],
     "additionalDirectories": [
       "C:\\Users\\muham\\Desktop\\salonapy-v2\\src",

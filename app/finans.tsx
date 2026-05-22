@@ -54,7 +54,10 @@ export default function Finans() {
     queryKey: queryKeys.transactions(tenantId, period),
     enabled: !!tenantId,
     queryFn: async () => {
-      const [txs, profile] = await Promise.all([api.transactions.list(period), api.tenant.get().catch(() => null)])
+      const [txsPage, profile] = await Promise.all([
+        api.transactions.list({ period, page: 1, limit: 50 }),
+        api.tenant.get().catch(() => null),
+      ])
       const today = new Date()
       const days = Array.from({ length: 15 }, (_, i) => {
         const d = new Date(today); d.setDate(d.getDate() - i)
@@ -63,14 +66,33 @@ export default function Finans() {
       const apts: Appointment[] = (await Promise.all(
         days.map(date => api.appointments.list({ date }).catch(() => []))
       )).flat()
-      return { transactions: txs, tenantProfile: profile, debts: apts.filter((a: Appointment) => a.status === 'TAMAMLANDI' && a.paid === false) }
+      return { txsPage, tenantProfile: profile, debts: apts.filter((a: Appointment) => a.status === 'TAMAMLANDI' && a.paid === false) }
     },
     staleTime: 60 * 1000,
   })
 
-  const transactions = finData?.transactions ?? []
+  const [extraTransactions, setExtraTransactions] = useState<Transaction[]>([])
+  const [txPage, setTxPage] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const txsPage = finData?.txsPage
+  const transactions = [...(txsPage?.data ?? []), ...extraTransactions]
+  const txHasMore = txsPage ? extraTransactions.length + (txsPage.data.length) < txsPage.total : false
   const tenantProfile = finData?.tenantProfile ?? null
   const debts = finData?.debts ?? []
+
+  async function loadMoreTransactions() {
+    if (!txsPage || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const next = await api.transactions.list({ period, page: txPage + 1, limit: 50 })
+      setExtraTransactions(prev => [...prev, ...next.data])
+      setTxPage(p => p + 1)
+    } catch {}
+    setLoadingMore(false)
+  }
+
+  // Period değişince extra'yı sıfırla
+  useMemo(() => { setExtraTransactions([]); setTxPage(1) }, [period])
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({
     type: 'GELIR' as 'GELIR' | 'GIDER',
@@ -280,6 +302,14 @@ export default function Finans() {
               contentContainerStyle={{ padding: 12, paddingBottom: dockPad }}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetch(); setRefreshing(false) }} tintColor="#7C3AED" />}
               ListEmptyComponent={<Text style={s.empty}>{t('finans_empty')}</Text>}
+              ListFooterComponent={txHasMore ? (
+                <TouchableOpacity style={s.loadMoreBtn} onPress={loadMoreTransactions} disabled={loadingMore}>
+                  {loadingMore
+                    ? <ActivityIndicator color="#7C3AED" size="small" />
+                    : <Text style={s.loadMoreTxt}>{t('load_more')}</Text>
+                  }
+                </TouchableOpacity>
+              ) : null}
               renderItem={({ item }) => {
                 const pm = PAYMENT_METHODS.find(p => p.value === item.paymentMethod)
                 return (
@@ -472,6 +502,8 @@ const s = StyleSheet.create({
   summaryLabel: { fontSize: 11, color: '#6B7280', marginBottom: 4, fontWeight: '600' },
   summaryVal: { fontSize: 16, fontWeight: '800' },
   empty: { textAlign: 'center', color: '#9CA3AF', paddingVertical: 48, fontSize: 14 },
+  loadMoreBtn: { alignItems: 'center', paddingVertical: 14, marginVertical: 8 },
+  loadMoreTxt: { fontSize: 14, fontWeight: '700', color: '#7C3AED' },
   row: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1, gap: 12 },
   typeIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   rowInfo: { flex: 1 },

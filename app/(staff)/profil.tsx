@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, ScrollView, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, ScrollView, ActivityIndicator, Modal, TextInput } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
@@ -7,6 +7,7 @@ import { secureStorage } from '@/lib/secureStorage'
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
+import { staffApi } from '@/lib/api'
 
 type StaffData = { name: string; staffId?: string; role?: string }
 
@@ -17,12 +18,42 @@ export default function StaffProfil() {
   const queryClient = useQueryClient()
   const [staffData, setStaffData] = useState<StaffData | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [showPassModal, setShowPassModal] = useState(false)
+  const [currentPass, setCurrentPass] = useState('')
+  const [newPass, setNewPass] = useState('')
+  const [newPassConfirm, setNewPassConfirm] = useState('')
+  const [changingPass, setChangingPass] = useState(false)
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
 
   useEffect(() => {
     secureStorage.getItem('staff_data').then(raw => {
       if (raw) setStaffData(JSON.parse(raw))
     })
   }, [])
+
+  async function handleChangePassword() {
+    if (!currentPass || !newPass || !newPassConfirm) {
+      Alert.alert(t('warning'), 'Tüm alanları doldurun'); return
+    }
+    if (newPass !== newPassConfirm) {
+      Alert.alert(t('warning'), 'Yeni şifreler eşleşmiyor'); return
+    }
+    if (newPass.length < 6) {
+      Alert.alert(t('warning'), 'Şifre en az 6 karakter olmalı'); return
+    }
+    setChangingPass(true)
+    try {
+      await staffApi.changePassword(currentPass, newPass)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      Alert.alert('Başarılı', 'Şifreniz güncellendi')
+      setShowPassModal(false)
+      setCurrentPass(''); setNewPass(''); setNewPassConfirm('')
+    } catch (e: unknown) {
+      Alert.alert(t('error'), e instanceof Error ? e.message : 'Şifre güncellenemedi')
+    }
+    setChangingPass(false)
+  }
 
   function handleLogout() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
@@ -83,6 +114,13 @@ export default function StaffProfil() {
             <Text style={s.shortcutTxt}>{t('staff_portal_view_apts')}</Text>
             <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
           </TouchableOpacity>
+          <TouchableOpacity style={s.shortcut} onPress={() => { Haptics.selectionAsync(); setShowPassModal(true) }}>
+            <View style={[s.shortcutIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="lock-closed-outline" size={20} color="#D97706" />
+            </View>
+            <Text style={s.shortcutTxt}>Şifre Değiştir</Text>
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
 
         {/* Bilgi notu */}
@@ -104,6 +142,68 @@ export default function StaffProfil() {
           }
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Şifre değiştir modal */}
+      <Modal visible={showPassModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowPassModal(false)}>
+        <View style={s.modal}>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>Şifre Değiştir</Text>
+            <TouchableOpacity onPress={() => setShowPassModal(false)} style={s.modalClose}>
+              <Ionicons name="close" size={22} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={s.modalBody} keyboardShouldPersistTaps="handled">
+            <Text style={s.inputLabel}>Mevcut Şifre</Text>
+            <View style={s.inputWrap}>
+              <TextInput
+                style={s.input}
+                value={currentPass}
+                onChangeText={setCurrentPass}
+                placeholder="••••••"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry={!showCurrent}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity onPress={() => setShowCurrent(v => !v)} style={s.eyeBtn}>
+                <Ionicons name={showCurrent ? 'eye-off-outline' : 'eye-outline'} size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+            <Text style={s.inputLabel}>Yeni Şifre</Text>
+            <View style={s.inputWrap}>
+              <TextInput
+                style={s.input}
+                value={newPass}
+                onChangeText={setNewPass}
+                placeholder="En az 6 karakter"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry={!showNew}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity onPress={() => setShowNew(v => !v)} style={s.eyeBtn}>
+                <Ionicons name={showNew ? 'eye-off-outline' : 'eye-outline'} size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+            <Text style={s.inputLabel}>Yeni Şifre (Tekrar)</Text>
+            <View style={s.inputWrap}>
+              <TextInput
+                style={s.input}
+                value={newPassConfirm}
+                onChangeText={setNewPassConfirm}
+                placeholder="••••••"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry={!showNew}
+                autoCapitalize="none"
+              />
+            </View>
+            <TouchableOpacity style={s.saveBtn} onPress={handleChangePassword} disabled={changingPass}>
+              {changingPass
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={s.saveTxt}>Şifreyi Güncelle</Text>
+              }
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -164,4 +264,16 @@ const s = StyleSheet.create({
   logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FEF2F2', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FECACA' },
   logoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
   logoutTxt: { fontSize: 15, fontWeight: '700', color: '#EF4444' },
+
+  modal: { flex: 1, backgroundColor: '#F4F4F8' },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  modalTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
+  modalClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  modalBody: { padding: 16 },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 6, marginTop: 14 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB' },
+  input: { flex: 1, height: 48, paddingHorizontal: 14, fontSize: 15, color: '#111827' },
+  eyeBtn: { paddingHorizontal: 12 },
+  saveBtn: { backgroundColor: '#7C3AED', borderRadius: 14, height: 52, justifyContent: 'center', alignItems: 'center', marginTop: 24 },
+  saveTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
 })

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, Alert, ActivityIndicator, Platform, RefreshControl,
+  Modal, TextInput, Alert, ActivityIndicator, Platform, RefreshControl, Linking,
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
@@ -241,7 +241,7 @@ export default function MusteriDetay() {
         <View style={s.section}>
           <Text style={s.sectionTitle}>{t('musteri_contact')}</Text>
           <View style={s.infoCard}>
-            <InfoRow icon="call-outline" label={t('musteri_field_phone')} value={customer.phone} />
+            <InfoRow icon="call-outline" label={t('musteri_field_phone')} value={customer.phone} isPhone />
             {customer.email && <InfoRow icon="mail-outline" label={t('musteri_field_email')} value={customer.email} />}
             {customer.birthday && <InfoRow icon="gift-outline" label={t('musteri_field_birthday')} value={customer.birthday} />}
             {customer.notes && <InfoRow icon="document-text-outline" label={t('musteri_field_notes')} value={customer.notes} />}
@@ -515,12 +515,17 @@ function StatCard({ icon, label, value, color }: { icon: IoniconsName; label: st
   )
 }
 
-function InfoRow({ icon, label, value }: { icon: IoniconsName; label: string; value: string }) {
+function InfoRow({ icon, label, value, isPhone }: { icon: IoniconsName; label: string; value: string; isPhone?: boolean }) {
   return (
     <View style={s.infoRow}>
       <Ionicons name={icon} size={15} color="#9CA3AF" />
       <Text style={s.infoLabel}>{label}</Text>
       <Text style={s.infoValue} numberOfLines={2}>{value}</Text>
+      {isPhone && (
+        <TouchableOpacity onPress={() => Linking.openURL(`tel:${value}`)} style={s.callBtn}>
+          <Ionicons name="call" size={14} color="#fff" />
+        </TouchableOpacity>
+      )}
     </View>
   )
 }
@@ -603,9 +608,10 @@ const s = StyleSheet.create({
   subLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
 
   infoCard: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
   infoLabel: { fontSize: 12, color: '#9CA3AF', fontWeight: '600', width: 80 },
   infoValue: { flex: 1, fontSize: 13, color: '#111827', fontWeight: '500' },
+  callBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#059669', justifyContent: 'center', alignItems: 'center' },
 
   sellBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EDE9FE', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
   sellBtnTxt: { fontSize: 12, fontWeight: '700', color: '#7C3AED' },

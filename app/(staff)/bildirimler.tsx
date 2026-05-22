@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useTranslation } from 'react-i18next'
+import { useFocusEffect } from 'expo-router'
 import { PUSH_NOTIFS_KEY, type StoredPushNotif } from '../_layout'
 
 const STAFF_READ_KEY = 'staff_push_read_ids'
@@ -42,6 +43,12 @@ export default function StaffBildirimler() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Tab'a her dönüşte ve ayrılışta badge yenilesin
+  useFocusEffect(useCallback(() => {
+    load()
+    return () => { load() }
+  }, [load]))
 
   async function handlePress(id: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)

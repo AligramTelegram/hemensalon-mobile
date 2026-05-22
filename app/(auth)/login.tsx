@@ -12,7 +12,9 @@ import { supabase } from '@/lib/supabase'
 import { secureStorage } from '@/lib/secureStorage'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { api, setCachedTenant } from '@/lib/api'
+import * as Notifications from 'expo-notifications'
 import { queryKeys } from '@/lib/queryKeys'
 
 const { width: SCREEN_W } = Dimensions.get('window')
@@ -75,10 +77,36 @@ export default function Login() {
   const [agreed, setAgreed] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
 
+  // Beni hatırla
+  const [rememberMe, setRememberMe] = useState(false)
+  const [rememberStaff, setRememberStaff] = useState(false)
+
   // Personel girişi
   const [staffEmail, setStaffEmail] = useState('')
   const [staffPassword, setStaffPassword] = useState('')
   const [showStaffPass, setShowStaffPass] = useState(false)
+
+  // Kayıtlı bilgileri yükle
+  useEffect(() => {
+    AsyncStorage.getItem('remember_owner').then(raw => {
+      if (!raw) return
+      try {
+        const saved = JSON.parse(raw)
+        setEmail(saved.email ?? '')
+        setPassword(saved.password ?? '')
+        setRememberMe(true)
+      } catch {}
+    })
+    AsyncStorage.getItem('remember_staff').then(raw => {
+      if (!raw) return
+      try {
+        const saved = JSON.parse(raw)
+        setStaffEmail(saved.email ?? '')
+        setStaffPassword(saved.password ?? '')
+        setRememberStaff(true)
+      } catch {}
+    })
+  }, [])
 
   async function handleSubmit() {
     if (mode === 'forgot') {
@@ -130,14 +158,22 @@ export default function Login() {
           await secureStorage.setItem('session_expires_at', (expiresAt * 1000).toString())
         }
       }
+      // Beni hatırla — işletme
+      if (rememberMe) {
+        await AsyncStorage.setItem('remember_owner', JSON.stringify({ email, password }))
+      } else {
+        await AsyncStorage.removeItem('remember_owner')
+      }
+
       // Tenant bilgisini al — staff hesabı ise engelle
       try {
         const tenant = await api.tenant.get()
+        setCachedTenant(tenant)
         const tid = tenant.id
         const today = new Date()
         const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
         await Promise.all([
-          queryClient.prefetchQuery({ queryKey: queryKeys.dashboard(tid), queryFn: () => api.dashboard.stats(), staleTime: 60 * 1000 }),
+          queryClient.prefetchQuery({ queryKey: queryKeys.dashboard(tid), queryFn: () => api.dashboard.full(), staleTime: 60 * 1000 }),
           queryClient.prefetchQuery({ queryKey: queryKeys.appointments(tid, todayStr), queryFn: () => api.appointments.list({ date: todayStr }), staleTime: 60 * 1000 }),
         ])
       } catch (e: unknown) {
@@ -244,6 +280,22 @@ export default function Login() {
         role: 'staff',
         staffId: data.staffId,
       }))
+      // Beni hatırla — personel
+      if (rememberStaff) {
+        await AsyncStorage.setItem('remember_staff', JSON.stringify({ email: staffEmail.trim(), password: staffPassword }))
+      } else {
+        await AsyncStorage.removeItem('remember_staff')
+      }
+      // Push token'ı giriş sonrası kaydet
+      try {
+        const { status } = await Notifications.requestPermissionsAsync()
+        if (status === 'granted') {
+          const tokenData = await Notifications.getExpoPushTokenAsync({
+            projectId: '95e15bc2-b5de-4a43-a884-7055e320b629',
+          })
+          await api.pushToken.registerStaff(tokenData.data)
+        }
+      } catch {}
       router.replace('/(staff)')
     } catch {
       Alert.alert(t('error'), t('err_general'))
@@ -490,6 +542,13 @@ export default function Login() {
                 }
               />
 
+              <TouchableOpacity style={s.rememberRow} onPress={() => { Haptics.selectionAsync(); setRememberStaff(v => !v) }} activeOpacity={0.7}>
+                <View style={[s.checkbox, rememberStaff && s.checkboxChecked]}>
+                  {rememberStaff && <Ionicons name="checkmark" size={13} color="#fff" />}
+                </View>
+                <Text style={s.rememberTxt}>{t('auth_remember_me')}</Text>
+              </TouchableOpacity>
+
               <SubmitBtn loading={loading} label={t('auth_staffLoginBtn')} onPress={handleStaffLogin} />
 
               <TouchableOpacity style={s.switchRow} onPress={() => { Haptics.selectionAsync(); setMode('login') }}>
@@ -570,9 +629,17 @@ export default function Login() {
               />
 
               {mode === 'login' && (
-                <TouchableOpacity style={s.forgotRow} onPress={() => setMode('forgot')}>
-                  <Text style={s.forgotTxt}>{t('auth_forgot_link')}</Text>
-                </TouchableOpacity>
+                <View style={s.loginMeta}>
+                  <TouchableOpacity style={s.rememberRow} onPress={() => { Haptics.selectionAsync(); setRememberMe(v => !v) }} activeOpacity={0.7}>
+                    <View style={[s.checkbox, rememberMe && s.checkboxChecked]}>
+                      {rememberMe && <Ionicons name="checkmark" size={13} color="#fff" />}
+                    </View>
+                    <Text style={s.rememberTxt}>{t('auth_remember_me')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setMode('forgot')}>
+                    <Text style={s.forgotTxt}>{t('auth_forgot_link')}</Text>
+                  </TouchableOpacity>
+                </View>
               )}
 
               {mode === 'register' && (
@@ -756,7 +823,9 @@ const s = StyleSheet.create({
   field: { flex: 1, fontSize: 15, color: '#111827', paddingVertical: 16, paddingRight: 14 },
   eyeBtn: { position: 'absolute', right: 14, padding: 4 },
 
-  forgotRow: { alignItems: 'flex-end', marginTop: -2, marginBottom: 14 },
+  loginMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: -2, marginBottom: 14 },
+  rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rememberTxt: { fontSize: 13, fontWeight: '600', color: '#374151' },
   forgotTxt: { fontSize: 13, fontWeight: '600', color: '#7C3AED' },
 
   agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
