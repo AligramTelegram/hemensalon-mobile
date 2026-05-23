@@ -16,13 +16,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { secureStorage } from '@/lib/secureStorage';
 import { scheduleTips } from '@/lib/scheduleTips';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+
+const persister = createAsyncStoragePersister({ storage: AsyncStorage })
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30 * 1000,           // 30 saniye: taze sayılır
-      gcTime: 10 * 60 * 1000,         // 10 dakika: bellekte tutulur
+      gcTime: 24 * 60 * 60 * 1000,    // 24 saat: persist cache için uzun tutulur
       retry: 1,
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,        // internet gelince yenile
@@ -336,7 +340,10 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister, maxAge: 24 * 60 * 60 * 1000 }}
+    >
     <SafeAreaProvider>
     <ThemeProvider>
       <Stack screenOptions={{
@@ -369,6 +376,6 @@ export default function RootLayout() {
       {!splashDone && <SplashAnimation onFinish={() => setSplashDone(true)} />}
     </ThemeProvider>
     </SafeAreaProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }
