@@ -102,9 +102,9 @@ async function handleUpgrade(planKey: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
 
     const PLAN_TO_PACKAGE: Record<string, string> = {
-      BASLANGIC:   'starter',
-      PROFESYONEL: 'professional',
-      ISLETME:     'business',
+      BASLANGIC:   'hemensalon_starter_monthly',
+      PROFESYONEL: 'hemensalon_professional_monthly',
+      ISLETME:     'hemensalon_business_monthly',
     }
     const pkgId = PLAN_TO_PACKAGE[planKey]
     const pkg = packages.find(p => p.identifier === pkgId)
