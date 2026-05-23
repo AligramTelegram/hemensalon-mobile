@@ -20,6 +20,11 @@ import { useTranslation } from 'react-i18next'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
+function todayISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 const STATUS_COLOR: Record<string, string> = {
   BEKLIYOR: '#F59E0B', ONAYLANDI: '#3B82F6',
   TAMAMLANDI: '#10B981', IPTAL: '#EF4444', GELMEDI: '#6B7280',
@@ -55,7 +60,7 @@ export default function Dashboard() {
     refetchInterval: 30 * 1000,
     queryFn: async () => {
       const [full, readIdsRaw] = await Promise.all([
-        api.dashboard.full(),
+        api.dashboard.full(todayISO()),
         AsyncStorage.getItem('read_notification_ids').catch(() => null),
       ])
       setUserName(full.tenant?.name ?? '')
@@ -412,10 +417,6 @@ export default function Dashboard() {
               </View>
               <Text style={s.emptyTitle}>{t('dashboard_noAppointments')}</Text>
               <Text style={s.emptySub}>{t('dashboard_noAppointmentsSub')}</Text>
-              <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/(tabs)/appointments')}>
-                <Ionicons name="add" size={16} color="#7C3AED" />
-                <Text style={s.emptyBtnTxt}>{t('dashboard_addAppointment')}</Text>
-              </TouchableOpacity>
             </View>
           ) : (
             stats?.recentAppointments.map((apt, idx) => (

@@ -520,7 +520,7 @@ export const staffApi = {
 export const api = {
   dashboard: {
     stats: () => get<DashboardStats>('/api/dashboard/stats'),
-    full: () => get<DashboardFull>('/api/dashboard/full'),
+    full: (date?: string) => get<DashboardFull>('/api/dashboard/full', date ? { date } : undefined),
   },
   appointments: {
     list: (params?: Record<string, string>) => get<Appointment[]>('/api/appointments', params),
