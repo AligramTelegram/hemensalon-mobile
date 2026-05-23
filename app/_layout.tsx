@@ -118,8 +118,27 @@ export default function RootLayout() {
       }
 
       // Staff token kontrolü
-      const st = await secureStorage.getItem('staff_token');
+      const [st, cachedTid] = await Promise.all([
+        secureStorage.getItem('staff_token'),
+        AsyncStorage.getItem('cached_tenant_id'),
+      ]);
       setStaffToken(st);
+
+      // Dönüş kullanıcısı: routing bitmeden arka planda prefetch başlat
+      if (s && !st && cachedTid && !isExpired) {
+        const d = new Date()
+        const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+        queryClient.prefetchQuery({
+          queryKey: ['dashboard', cachedTid],
+          queryFn: () => api.dashboard.full(todayStr),
+          staleTime: 20 * 1000,
+        }).catch(() => {})
+        queryClient.prefetchQuery({
+          queryKey: ['appointments', cachedTid, todayStr],
+          queryFn: () => api.appointments.list({ date: todayStr }),
+          staleTime: 20 * 1000,
+        }).catch(() => {})
+      }
 
       if (s) {
         try {
@@ -209,6 +228,7 @@ export default function RootLayout() {
         secureStorage.removeItem('mobile_token');
         secureStorage.removeItem('refresh_token');
         secureStorage.removeItem('login_time');
+        AsyncStorage.removeItem('cached_tenant_id').catch(() => {});
         setStaffToken(null);
       }
     });

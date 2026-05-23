@@ -195,12 +195,13 @@ export default function Login() {
       try {
         const tenant = getCachedTenant() ?? await api.tenant.get()
         setCachedTenant(tenant)
+        AsyncStorage.setItem('cached_tenant_id', tenant.id).catch(() => {})
         const tid = tenant.id
         const today = new Date()
         const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
         await Promise.all([
-          queryClient.prefetchQuery({ queryKey: queryKeys.dashboard(tid), queryFn: () => api.dashboard.full(), staleTime: 60 * 1000 }),
-          queryClient.prefetchQuery({ queryKey: queryKeys.appointments(tid, todayStr), queryFn: () => api.appointments.list({ date: todayStr }), staleTime: 60 * 1000 }),
+          queryClient.prefetchQuery({ queryKey: queryKeys.dashboard(tid), queryFn: () => api.dashboard.full(todayStr), staleTime: 20 * 1000 }),
+          queryClient.prefetchQuery({ queryKey: queryKeys.appointments(tid, todayStr), queryFn: () => api.appointments.list({ date: todayStr }), staleTime: 20 * 1000 }),
         ])
       } catch {
         // Prefetch hatası — devam et
