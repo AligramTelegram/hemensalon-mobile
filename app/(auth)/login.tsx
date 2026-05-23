@@ -13,7 +13,7 @@ import { secureStorage } from '@/lib/secureStorage'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { api, setCachedTenant } from '@/lib/api'
+import { api, setCachedTenant, getCachedTenant } from '@/lib/api'
 import * as Notifications from 'expo-notifications'
 import { queryKeys } from '@/lib/queryKeys'
 
@@ -149,15 +149,42 @@ export default function Login() {
       }
 
       const accessToken = data.session?.access_token
+
+      // Tenant bilgisini al — staff hesabı ise engelle
+      // mobile_token'ı HENÜZ secureStorage'a kaydetmiyoruz; routing effect tetiklenmesin
       if (accessToken) {
+        const expiresAt = data.session?.expires_at
+        // Direkt fetch ile staff kontrolü yap (secureStorage'a kaydetmeden)
+        try {
+          const checkRes = await fetch(`${BASE}/api/me`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-mobile-token': accessToken,
+              'Authorization': `Bearer ${accessToken}`,
+            },
+          })
+          const checkData = await checkRes.json().catch(() => ({}))
+          if (!checkRes.ok) {
+            if (checkData?.error === 'STAFF_ACCOUNT') {
+              await supabase.auth.signOut()
+              setLoading(false)
+              Alert.alert(t('auth_staff_title'), t('auth_staff_msg'), [{ text: t('ok') }])
+              return
+            }
+            // Diğer hatalarda devam et
+          } else {
+            setCachedTenant(checkData)
+          }
+        } catch { /* ağ hatası — devam et */ }
+
+        // Kontrol geçti, şimdi kaydet
         await secureStorage.setItem('mobile_token', accessToken)
         await secureStorage.setItem('login_time', Date.now().toString())
-        // JWT expiry'sini sakla (expires_at saniye cinsinden)
-        const expiresAt = data.session?.expires_at
         if (expiresAt) {
           await secureStorage.setItem('session_expires_at', (expiresAt * 1000).toString())
         }
       }
+
       // Beni hatırla — işletme
       if (rememberMe) {
         await AsyncStorage.setItem('remember_owner', JSON.stringify({ email, password }))
@@ -165,9 +192,8 @@ export default function Login() {
         await AsyncStorage.removeItem('remember_owner')
       }
 
-      // Tenant bilgisini al — staff hesabı ise engelle
       try {
-        const tenant = await api.tenant.get()
+        const tenant = getCachedTenant() ?? await api.tenant.get()
         setCachedTenant(tenant)
         const tid = tenant.id
         const today = new Date()
@@ -176,19 +202,8 @@ export default function Login() {
           queryClient.prefetchQuery({ queryKey: queryKeys.dashboard(tid), queryFn: () => api.dashboard.full(), staleTime: 60 * 1000 }),
           queryClient.prefetchQuery({ queryKey: queryKeys.appointments(tid, todayStr), queryFn: () => api.appointments.list({ date: todayStr }), staleTime: 60 * 1000 }),
         ])
-      } catch (e: unknown) {
-        if (e instanceof Error && e.message.includes('STAFF_ACCOUNT')) {
-          await supabase.auth.signOut()
-          await secureStorage.removeItem('mobile_token')
-          setLoading(false)
-          Alert.alert(
-            t('auth_staff_title'),
-            t('auth_staff_msg'),
-            [{ text: t('ok') }]
-          )
-          return
-        }
-        // Diğer prefetch hatalarında devam et
+      } catch {
+        // Prefetch hatası — devam et
       }
       setLoading(false)
       router.replace('/(tabs)')
