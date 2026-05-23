@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.appointly.hemensalon",
-      "buildNumber": "15",
+      "buildNumber": "16",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Müşteri profil fotoğrafı eklemek için galeri erişimi gereklidir.",
         "NSPhotoLibraryAddUsageDescription": "Fotoğraf kaydetmek için galeri erişimi gereklidir.",
@@ -73,7 +73,8 @@
       "expo-asset",
       "expo-font",
       "expo-localization",
-      "expo-web-browser"
+      "expo-web-browser",
+      "react-native-purchases"
     ],
     "scheme": "hemensalon",
     "extra": {
