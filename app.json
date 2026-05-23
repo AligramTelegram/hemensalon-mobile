@@ -73,8 +73,7 @@
       "expo-asset",
       "expo-font",
       "expo-localization",
-      "expo-web-browser",
-      "react-native-purchases"
+      "expo-web-browser"
     ],
     "scheme": "hemensalon",
     "extra": {
