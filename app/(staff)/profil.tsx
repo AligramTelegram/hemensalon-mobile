@@ -37,20 +37,20 @@ export default function StaffProfil() {
       Alert.alert(t('warning'), 'Tüm alanları doldurun'); return
     }
     if (newPass !== newPassConfirm) {
-      Alert.alert(t('warning'), 'Yeni şifreler eşleşmiyor'); return
+      Alert.alert(t('warning'), t('staff_pass_mismatch')); return
     }
     if (newPass.length < 6) {
-      Alert.alert(t('warning'), 'Şifre en az 6 karakter olmalı'); return
+      Alert.alert(t('warning'), t('staff_password_min')); return
     }
     setChangingPass(true)
     try {
       await staffApi.changePassword(currentPass, newPass)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-      Alert.alert('Başarılı', 'Şifreniz güncellendi')
+      Alert.alert(t('success'), t('staff_pass_updated'))
       setShowPassModal(false)
       setCurrentPass(''); setNewPass(''); setNewPassConfirm('')
     } catch (e: unknown) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : 'Şifre güncellenemedi')
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('staff_pass_failed'))
     }
     setChangingPass(false)
   }

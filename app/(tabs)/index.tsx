@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, Platform, Animated, Easing, Pressable,
-  Alert,
+  Alert, AppState,
 } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useDockPad } from '@/lib/useDockPad'
@@ -54,10 +54,17 @@ export default function Dashboard() {
   const [userName, setUserName] = useState('')
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
 
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active')
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => setAppActive(state === 'active'))
+    return () => sub.remove()
+  }, [])
+
   const { data: dashData, isLoading: loading, refetch: refetchDash } = useQuery({
     queryKey: queryKeys.dashboard(tenantId),
     enabled: !!tenantId,
-    refetchInterval: 30 * 1000,
+    refetchInterval: appActive ? 30 * 1000 : false,
     queryFn: async () => {
       const [full, readIdsRaw] = await Promise.all([
         api.dashboard.full(todayISO()),

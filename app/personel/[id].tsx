@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator, Platform, RefreshControl, TextInput, Modal,
+  Alert, ActivityIndicator, Platform, RefreshControl, TextInput, Modal, Animated, Easing,
 } from 'react-native'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { useHeaderPad } from '@/lib/useHeaderPad'
@@ -228,7 +228,36 @@ export default function PersonelDetay() {
     )
   }
 
-  if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#7C3AED" /></View>
+  const pulseAnim = useRef(new Animated.Value(0.4)).current
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]))
+    loop.start()
+    return () => loop.stop()
+  }, [pulseAnim])
+
+  if (loading) return (
+    <View style={s.root}>
+      <View style={[s.hero, { backgroundColor: '#7C3AED', paddingTop: headerPad }]}>
+        <View style={s.decoCircle1} /><View style={s.decoCircle2} />
+        <Animated.View style={{ opacity: pulseAnim, gap: 10, marginTop: 16 }}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.3)' }} />
+          <View style={{ width: 150, height: 18, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.3)' }} />
+          <View style={{ width: 100, height: 13, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+        </Animated.View>
+      </View>
+      <View style={{ padding: 16, gap: 12 }}>
+        {[1,2,3].map(i => (
+          <Animated.View key={i} style={[s.skeletonCard, { opacity: pulseAnim }]}>
+            <View style={{ width: '50%', height: 13, borderRadius: 6, backgroundColor: '#E5E7EB', marginBottom: 10 }} />
+            <View style={{ width: '80%', height: 18, borderRadius: 8, backgroundColor: '#E5E7EB' }} />
+          </Animated.View>
+        ))}
+      </View>
+    </View>
+  )
   if (!staff) return null
 
   const stats = staff.monthStats ?? { count: 0, revenue: 0, completedCount: 0 }
@@ -747,6 +776,7 @@ function PerfRow({ label, value, max, color, suffix = '' }: { label: string; val
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F4F4F8' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  skeletonCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
 
   hero: { paddingBottom: 28, paddingHorizontal: 20, overflow: 'hidden' },
   decoCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(0,0,0,0.12)', top: -60, right: -40 },

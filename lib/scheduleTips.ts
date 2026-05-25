@@ -6,10 +6,8 @@ const NOTIF_IDENTIFIER_PREFIX = 'salon_tip_'
 const SCHEDULE_KEY = 'tips_scheduled_until'
 const DAYS_AHEAD = 7
 
-const START_HOUR = 9   // 09:00
-const END_HOUR = 19    // 19:00 (7 akşam)
-const PER_HOUR = 2     // saatte 2 bildirim
-const MAX_NOTIFS = 50  // iOS limiti 64, güvenli kalıyoruz
+const DAILY_SLOTS = [10, 15]  // 10:00 ve 15:00
+const MAX_NOTIFS = 50         // iOS limiti 64, güvenli kalıyoruz
 
 async function cancelExistingTips() {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync()
@@ -47,36 +45,34 @@ export async function scheduleTips() {
       targetDate.setDate(now.getDate() + dayOffset)
       const doy = dayOfYear(targetDate)
 
-      for (let hour = START_HOUR; hour < END_HOUR; hour++) {
-        for (let slot = 0; slot < PER_HOUR; slot++) {
-          // Seed: gün + saat + slot → deterministic ama rastgele görünen dakika
-          const seed = doy * 100 + hour * 10 + slot
-          const minute = Math.floor(seededRandom(seed) * 60)
+      for (let slotIdx = 0; slotIdx < DAILY_SLOTS.length; slotIdx++) {
+        const hour = DAILY_SLOTS[slotIdx]
+        const seed = doy * 10 + slotIdx
+        const minute = Math.floor(seededRandom(seed) * 60)
 
-          const fireTime = new Date(targetDate)
-          fireTime.setHours(hour, minute, 0, 0)
+        const fireTime = new Date(targetDate)
+        fireTime.setHours(hour, minute, 0, 0)
 
-          if (fireTime <= now) continue
+        if (fireTime <= now) continue
 
-          const tipIdx = (seed * 7 + 3) % tips.length
-          const tip = tips[tipIdx]
+        const tipIdx = (seed * 7 + 3) % tips.length
+        const tip = tips[tipIdx]
 
-          if (notifCount >= MAX_NOTIFS) break outer
-          await Notifications.scheduleNotificationAsync({
-            identifier: `${NOTIF_IDENTIFIER_PREFIX}${doy}_${hour}_${slot}`,
-            content: {
-              title: tip.title,
-              body: tip.body,
-              sound: false,
-              data: { type: 'salon_tip' },
-            },
-            trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.DATE,
-              date: fireTime,
-            },
-          })
-          notifCount++
-        }
+        if (notifCount >= MAX_NOTIFS) break outer
+        await Notifications.scheduleNotificationAsync({
+          identifier: `${NOTIF_IDENTIFIER_PREFIX}${doy}_${slotIdx}`,
+          content: {
+            title: tip.title,
+            body: tip.body,
+            sound: false,
+            data: { type: 'salon_tip' },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: fireTime,
+          },
+        })
+        notifCount++
       }
     }
   } catch {

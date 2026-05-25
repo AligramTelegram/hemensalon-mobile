@@ -116,7 +116,10 @@
       "Bash(for f *)",
       "Read(//c/Users/muham/Desktop/salonapy-v2/src/app/api/cron$f/**)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\muham\\\\Desktop\\\\salonapy-v2\\\\src\\\\app\\\\api\\\\cron\" -Recurse -Filter \"route.ts\" | ForEach-Object { Write-Host \"=== $\\($_.Directory.Name\\) ===\"; Get-Content $_.FullName | Select-Object -First 8; Write-Host \"\" })",
-      "Bash(xargs grep -l \"STAFF_ACCOUNT\")"
+      "Bash(xargs grep -l \"STAFF_ACCOUNT\")",
+      "WebFetch(domain:hemensalon.com)",
+      "WebFetch(domain:expo.dev)",
+      "Bash(eas build:list --platform ios --limit 3 --non-interactive)"
     ],
     "additionalDirectories": [
       "C:\\Users\\muham\\Desktop\\salonapy-v2\\src",

@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, Platform, Switch, Linking,
+  TextInput, Alert, ActivityIndicator, Platform, Switch, Linking, Animated, Easing,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
@@ -219,7 +219,37 @@ export default function Ayarlar() {
 
   const planColor = PLAN_COLOR[profile?.plan ?? 'BASLANGIC']
 
-  if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#7C3AED" /></View>
+  const pulseAnim = useRef(new Animated.Value(0.4)).current
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]))
+    loop.start()
+    return () => loop.stop()
+  }, [pulseAnim])
+
+  if (loading) return (
+    <View style={s.root}>
+      <View style={[s.hero, { paddingTop: headerPad }]}>
+        <View style={s.decoCircle1} /><View style={s.decoCircle2} />
+        <View style={s.heroTopRow} />
+        <Animated.View style={{ opacity: pulseAnim, gap: 10 }}>
+          <View style={{ width: 120, height: 20, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.3)' }} />
+          <View style={{ width: 180, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+        </Animated.View>
+      </View>
+      <View style={s.heroCurve} />
+      <View style={{ padding: 16, gap: 12 }}>
+        {[1,2,3,4].map(i => (
+          <Animated.View key={i} style={[s.skeletonCard, { opacity: pulseAnim }]}>
+            <View style={{ width: '40%', height: 13, borderRadius: 6, backgroundColor: '#E5E7EB', marginBottom: 10 }} />
+            <View style={{ width: '70%', height: 18, borderRadius: 8, backgroundColor: '#E5E7EB' }} />
+          </Animated.View>
+        ))}
+      </View>
+    </View>
+  )
 
   return (
     <View style={s.root}>
@@ -623,6 +653,7 @@ function IntegrationRow({ icon, color, title, desc, onPress, badge, badgeColor =
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F4F4F8' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  skeletonCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
 
   hero: { backgroundColor: '#7C3AED', paddingBottom: 24, paddingHorizontal: 20, overflow: 'hidden' },
   decoCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: '#6D28D9', opacity: 0.4, top: -60, right: -40 },

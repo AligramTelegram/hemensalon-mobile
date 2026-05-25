@@ -200,7 +200,7 @@ export default function DenemeBitti() {
                 {pkg.identifier === preferredPlanId ? (
                   <View style={[s.popularBadge, { backgroundColor: meta.color }]}>
                     <Ionicons name="star" size={10} color="#fff" />
-                    <Text style={s.popularTxt}>Seçtiğiniz Plan</Text>
+                    <Text style={s.popularTxt}>{t('sub_selected_plan', { plan: t(meta.labelKey) })}</Text>
                   </View>
                 ) : meta.popular ? (
                   <View style={[s.popularBadge, { backgroundColor: meta.color }]}>
@@ -217,7 +217,7 @@ export default function DenemeBitti() {
                     <Text style={s.planName}>{t(meta.labelKey)}</Text>
                     <Text style={[s.planPrice, { color: meta.color }]}>
                       {pkg.product.priceString}
-                      <Text style={s.planPer}>/ay</Text>
+                      <Text style={s.planPer}>{t('sub_per_month')}</Text>
                     </Text>
                   </View>
                 </View>
@@ -260,7 +260,7 @@ export default function DenemeBitti() {
                 {isPreferred ? (
                   <View style={[s.popularBadge, { backgroundColor: plan.color }]}>
                     <Ionicons name="star" size={10} color="#fff" />
-                    <Text style={s.popularTxt}>{t('sub_selected_plan')}</Text>
+                    <Text style={s.popularTxt}>{t('sub_selected_plan', { plan: t(plan.labelKey) })}</Text>
                   </View>
                 ) : plan.popular ? (
                   <View style={[s.popularBadge, { backgroundColor: plan.color }]}>
@@ -275,7 +275,7 @@ export default function DenemeBitti() {
                   <View style={{ flex: 1 }}>
                     <Text style={s.planName}>{t(plan.labelKey)}</Text>
                     <Text style={[s.planPrice, { color: plan.color }]}>
-                      {formatPrice(price as number, pricing.symbol)}<Text style={s.planPer}>/ay</Text>
+                      {formatPrice(price as number, pricing.symbol)}<Text style={s.planPer}>{t('sub_per_month')}</Text>
                     </Text>
                   </View>
                 </View>
@@ -292,7 +292,7 @@ export default function DenemeBitti() {
                   onPress={() => Alert.alert(t('sub_store_title'), t('sub_store_msg'))}
                   activeOpacity={0.88}
                 >
-                  <Text style={s.buyBtnTxt}>{formatPrice(price as number, pricing.symbol)}/ay {t('sub_upgrade_btn')}</Text>
+                  <Text style={s.buyBtnTxt}>{formatPrice(price as number, pricing.symbol)}{t('sub_per_month')} {t('sub_upgrade_btn')}</Text>
                 </TouchableOpacity>
               </View>
             )

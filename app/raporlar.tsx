@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, RefreshControl, TextInput, Modal, Alert } from 'react-native'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, RefreshControl, TextInput, Modal, Alert, Animated, Easing } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useDockPad } from '@/lib/useDockPad'
@@ -196,7 +196,7 @@ tbody td{padding:9px 12px;font-size:13px;border-bottom:1px solid #F3F4F6}
         </View>
       </Modal>
 
-      {loading ? <View style={s.center}><ActivityIndicator color="#7C3AED" /></View> : (
+      {loading ? <RaporlarSkeleton /> : (
         <ScrollView style={s.body} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor="#7C3AED" />}>
 
@@ -413,6 +413,38 @@ function EmptyState({ text }: { text: string }) {
   )
 }
 
+function RaporlarSkeleton() {
+  const pulseAnim = useRef(new Animated.Value(0.4)).current
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]))
+    loop.start()
+    return () => loop.stop()
+  }, [pulseAnim])
+  return (
+    <View style={{ flex: 1, padding: 16, gap: 12 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        {[1,2,3,4].map(i => (
+          <Animated.View key={i} style={[s.skeletonCard, { width: '47%', opacity: pulseAnim }]}>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#E5E7EB', marginBottom: 10 }} />
+            <View style={{ width: '60%', height: 13, borderRadius: 6, backgroundColor: '#E5E7EB', marginBottom: 6 }} />
+            <View style={{ width: '40%', height: 20, borderRadius: 8, backgroundColor: '#E5E7EB' }} />
+          </Animated.View>
+        ))}
+      </View>
+      {[1,2].map(i => (
+        <Animated.View key={i} style={[s.skeletonCard, { opacity: pulseAnim }]}>
+          <View style={{ width: '50%', height: 13, borderRadius: 6, backgroundColor: '#E5E7EB', marginBottom: 10 }} />
+          <View style={{ width: '100%', height: 10, borderRadius: 5, backgroundColor: '#E5E7EB', marginBottom: 8 }} />
+          <View style={{ width: '80%', height: 10, borderRadius: 5, backgroundColor: '#E5E7EB' }} />
+        </Animated.View>
+      ))}
+    </View>
+  )
+}
+
 const rc = StyleSheet.create({
   card: { width: '47.5%', borderRadius: 14, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 },
   icon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
@@ -423,6 +455,7 @@ const rc = StyleSheet.create({
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F4F4F8' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  skeletonCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
   header: { backgroundColor: '#7C3AED', paddingBottom: 0, paddingHorizontal: 16, overflow: 'hidden' },
   decoCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: '#5B21B6', opacity: 0.35, top: -60, right: -40 },
   decoCircle2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#fff', opacity: 0.05, bottom: -20, left: 20 },
