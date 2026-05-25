@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Animated, Easing, Alert, ActivityIndicator,
+  Animated, Easing, Alert, ActivityIndicator, Linking, Platform,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useRouter } from 'expo-router'
 import { useTrial } from '@/lib/useTrial'
+import { setCachedTenant } from '@/lib/api'
 import {
   getOfferings, purchasePackage, restorePurchases,
   isAnyPaidActive, type PurchaseResult,
@@ -26,19 +27,26 @@ type PlanMeta = {
 }
 
 const PLAN_META: Record<string, PlanMeta> = {
-  baslangic_monthly: {
+  hemensalon_starter_monthly: {
     labelKey: 'plan_BASLANGIC_label', color: '#2563EB', bg: '#EFF6FF', icon: 'rocket-outline',
     featureKeys: ['plan_mini_baslangic_f1', 'plan_mini_baslangic_f2', 'plan_mini_baslangic_f3'],
   },
-  profesyonel_monthly: {
+  hemensalon_professional_monthly: {
     labelKey: 'plan_PROFESYONEL_label', color: '#7C3AED', bg: '#EDE9FE', icon: 'flash-outline',
     popular: true,
     featureKeys: ['plan_mini_profesyonel_f1', 'plan_mini_profesyonel_f2', 'plan_mini_profesyonel_f3'],
   },
-  isletme_monthly: {
+  hemensalon_business_monthly: {
     labelKey: 'plan_ISLETME_label', color: '#D97706', bg: '#FEF3C7', icon: 'business-outline',
     featureKeys: ['plan_mini_isletme_f1', 'plan_mini_isletme_f2', 'plan_mini_isletme_f3'],
   },
+}
+
+// Backend plan key → RevenueCat package identifier
+const PLAN_TO_RC_ID: Record<string, string> = {
+  BASLANGIC:   'hemensalon_starter_monthly',
+  PROFESYONEL: 'hemensalon_professional_monthly',
+  ISLETME:     'hemensalon_business_monthly',
 }
 
 export default function DenemeBitti() {
@@ -95,6 +103,7 @@ export default function DenemeBitti() {
     if (result.success) {
       if (isAnyPaidActive(result.customerInfo)) {
         await AsyncStorage.removeItem('selected_plan')
+        setCachedTenant(null) // route guard'ın taze veri çekmesini sağla
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
         Alert.alert(t('trial_welcome_title'), t('trial_welcome_msg'), [
           { text: t('continue'), onPress: () => router.replace('/(tabs)') },
@@ -112,6 +121,7 @@ export default function DenemeBitti() {
     setRestoring(false)
 
     if (result.success && isAnyPaidActive(result.customerInfo)) {
+      setCachedTenant(null)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       Alert.alert(t('trial_restored_title'), t('trial_restored_msg'), [
         { text: t('continue'), onPress: () => router.replace('/(tabs)') },
@@ -161,7 +171,7 @@ export default function DenemeBitti() {
         </View>
 
         {isSubExpired && trial.profile && packages.length > 0 && (() => {
-          const currentPlanKey = trial.profile!.plan.toLowerCase() + '_monthly'
+          const currentPlanKey = PLAN_TO_RC_ID[trial.profile!.plan] ?? ''
           const currentPkg = packages.find(p => p.identifier === currentPlanKey)
           if (!currentPkg) return null
           const meta = PLAN_META[currentPkg.identifier]
@@ -254,7 +264,7 @@ export default function DenemeBitti() {
           ].map(plan => {
             const priceKey: Record<string, 'starter' | 'professional' | 'business'> = { BASLANGIC: 'starter', PROFESYONEL: 'professional', ISLETME: 'business' }
             const price = pricing[priceKey[plan.key]]
-            const isPreferred = preferredPlanId === plan.key.toLowerCase() + '_monthly'
+            const isPreferred = preferredPlanId === PLAN_TO_RC_ID[plan.key]
             return (
               <View key={plan.key} style={[s.planCard, (plan.popular || isPreferred) && { borderColor: plan.color, borderWidth: 2 }]}>
                 {isPreferred ? (
@@ -289,7 +299,12 @@ export default function DenemeBitti() {
                 </View>
                 <TouchableOpacity
                   style={[s.buyBtn, { backgroundColor: plan.color }]}
-                  onPress={() => Alert.alert(t('sub_store_title'), t('sub_store_msg'))}
+                  onPress={() => {
+                    const url = Platform.OS === 'ios'
+                      ? 'https://apps.apple.com/app/id6746543510'
+                      : 'https://play.google.com/store/apps/details?id=com.appointly.app'
+                    Linking.openURL(url)
+                  }}
                   activeOpacity={0.88}
                 >
                   <Text style={s.buyBtnTxt}>{formatPrice(price as number, pricing.symbol)}{t('sub_per_month')} {t('sub_upgrade_btn')}</Text>

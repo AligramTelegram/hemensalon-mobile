@@ -7,7 +7,7 @@ import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
-import { api, TenantProfile } from '@/lib/api'
+import { api, TenantProfile, setCachedTenant } from '@/lib/api'
 import { detectCountry, getPricing, formatPrice } from '@/lib/pricing'
 import { useTrial } from '@/lib/useTrial'
 import { getOfferings, purchasePackage, restorePurchases, isAnyPaidActive } from '@/lib/purchases'
@@ -101,6 +101,21 @@ async function handleUpgrade(planKey: string) {
     if (planKey === profile?.plan) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
 
+    const isDowngrade = PLANS.findIndex(p => p.key === planKey) < PLANS.findIndex(p => p.key === profile?.plan)
+
+    // Downgrade: App Store/Google Play kuralları gereği RevenueCat üzerinden yapılamaz
+    if (isDowngrade) {
+      Alert.alert(
+        t('sub_downgrade_title'),
+        t('sub_downgrade_info'),
+        [
+          { text: t('cancel'), style: 'cancel' },
+          { text: t('sub_contact_support'), style: 'default', onPress: () => Linking.openURL('mailto:destek@hemensalon.com') },
+        ]
+      )
+      return
+    }
+
     const PLAN_TO_PACKAGE: Record<string, string> = {
       BASLANGIC:   'hemensalon_starter_monthly',
       PROFESYONEL: 'hemensalon_professional_monthly',
@@ -115,6 +130,7 @@ async function handleUpgrade(planKey: string) {
       setPurchasing(null)
       if (result.success && isAnyPaidActive(result.customerInfo)) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+        setCachedTenant(null) // route guard'ın taze veri çekmesini sağla
         Alert.alert('🎉', t('sub_purchase_success'), [
           { text: t('ok'), onPress: () => load() },
         ])
