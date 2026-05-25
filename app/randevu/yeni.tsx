@@ -89,7 +89,6 @@ export default function YeniRandevu() {
   const [selectedTime, setSelectedTime] = useState('10:00')
   const [price, setPrice] = useState('')
   const [notes, setNotes] = useState('')
-  const [showSaveCustomerModal, setShowSaveCustomerModal] = useState(false)
 
   const days = nextWeekDays(14, t('today'), t('tomorrow'))
 
@@ -241,19 +240,15 @@ export default function YeniRandevu() {
         }
       } catch {}
 
-      if (!selectedCustomer && guestName.trim()) {
-        setShowSaveCustomerModal(true)
-      } else {
-        router.back()
-      }
+      router.back()
     } catch (e: unknown) {
       if (e instanceof PlanLimitError) {
         Alert.alert(
-          '🔒 Aylık Randevu Limitine Ulaştınız',
+          t('apt_limit_title'),
           e.message,
           [
-            { text: 'Tamam', style: 'cancel' },
-            { text: 'Paketi Yükselt', style: 'default', onPress: () => router.push('/abonelik' as never) },
+            { text: t('ok'), style: 'cancel' },
+            { text: t('plan_upgrade_btn'), style: 'default', onPress: () => router.push('/abonelik' as never) },
           ]
         )
       } else {
@@ -568,32 +563,7 @@ export default function YeniRandevu() {
       {/* Alt adım yazısı */}
       <Text style={s.stepHint}>{t('apt_step_hint', { current: step + 1, total: STEP_LABELS.length, label: STEP_LABELS[step] })}</Text>
 
-      {/* Müşteriyi kaydet modal */}
-      {showSaveCustomerModal && (
-        <View style={s.saveModalOverlay}>
-          <View style={s.saveModal}>
-            <View style={s.saveModalIcon}>
-              <Ionicons name="person-add-outline" size={32} color="#2563EB" />
-            </View>
-            <Text style={s.saveModalTitle}>{t('apt_save_customer_title')}</Text>
-            <Text style={s.saveModalSub}>
-              {t('apt_save_customer_sub', { name: `${guestName}${guestPhone ? ` (${guestPhone})` : ''}` })}
-            </Text>
-            <TouchableOpacity
-              style={s.saveModalPrimary}
-              onPress={() => { setShowSaveCustomerModal(false); router.back() }}
-            >
-              <Text style={s.saveModalPrimaryTxt}>{t('apt_save_yes')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={s.saveModalSecondary}
-              onPress={() => { setShowSaveCustomerModal(false); router.back() }}
-            >
-              <Text style={s.saveModalSecondaryTxt}>{t('apt_save_no')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+
     </View>
   )
 }

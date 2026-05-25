@@ -432,7 +432,7 @@ export default function PersonelDetay() {
               ? <Text style={s.empty}>{t('staff_noAppointments')}</Text>
               : recentApts.map(apt => (
                 <View key={apt.id} style={s.aptRow}>
-                  <View style={[s.aptDot, { backgroundColor: apt.service.color }]} />
+                  <View style={[s.aptDot, { backgroundColor: apt.service.color ?? '#7C3AED' }]} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.aptCustomer}>{apt.customer.name}</Text>
                     <Text style={s.aptService}>{apt.service.name}</Text>

@@ -65,18 +65,18 @@ export default function Dashboard() {
     queryKey: queryKeys.dashboard(tenantId),
     enabled: !!tenantId,
     refetchInterval: appActive ? 30 * 1000 : false,
-    queryFn: async () => {
-      const [full, readIdsRaw] = await Promise.all([
-        api.dashboard.full(todayISO()),
-        AsyncStorage.getItem('read_notification_ids').catch(() => null),
-      ])
-      setUserName(full.tenant?.name ?? '')
-      const readIds: Set<string> = readIdsRaw ? new Set(JSON.parse(readIdsRaw)) : new Set()
-      setUnreadNotifCount(full.notifications.filter(n => n.isNew && !readIds.has(n.id)).length)
-      return full
-    },
+    queryFn: () => api.dashboard.full(todayISO()),
     staleTime: 20 * 1000,
   })
+
+  useEffect(() => {
+    if (!dashData) return
+    setUserName(dashData.tenant?.name ?? '')
+    AsyncStorage.getItem('read_notification_ids').catch(() => null).then(readIdsRaw => {
+      const readIds: Set<string> = readIdsRaw ? new Set(JSON.parse(readIdsRaw)) : new Set()
+      setUnreadNotifCount(dashData.notifications.filter(n => n.isNew && !readIds.has(n.id)).length)
+    })
+  }, [dashData])
 
   const stats = dashData?.stats ?? null
   const usage = dashData?.usage ?? null

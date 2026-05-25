@@ -5,13 +5,14 @@ import { SplashAnimation } from '@/components/SplashAnimation';
 import { detectCountry } from '@/lib/pricing';
 import { initI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
-import { View, ActivityIndicator, I18nManager, Platform } from 'react-native';
+import { View, ActivityIndicator, I18nManager, Platform, Alert } from 'react-native';
 import { isRTL } from '@/lib/i18n';
 import * as Notifications from 'expo-notifications';
 import { api, getCachedTenant, setCachedTenant } from '@/lib/api';
 import { initPurchases } from '@/lib/purchases';
 import type { Session } from '@supabase/supabase-js';
 import { ThemeProvider } from '@/lib/theme'
+import { EXPO_PROJECT_ID } from '@/lib/constants'
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { secureStorage } from '@/lib/secureStorage';
@@ -106,6 +107,7 @@ export default function RootLayout() {
         await secureStorage.removeItem('staff_data')
         await secureStorage.removeItem('login_time')
         await secureStorage.removeItem('session_expires_at')
+        Alert.alert('', 'Oturumunuzun süresi doldu, lütfen tekrar giriş yapın.')
       }
 
       // Supabase session kontrolü
@@ -151,10 +153,15 @@ export default function RootLayout() {
           console.warn('[RevenueCat] initPurchases failed:', e)
         }
         try {
-          const { status } = await Notifications.requestPermissionsAsync();
+          const asked = await AsyncStorage.getItem('notif_permission_asked')
+          if (!asked) {
+            await Notifications.requestPermissionsAsync()
+            await AsyncStorage.setItem('notif_permission_asked', '1')
+          }
+          const { status } = await Notifications.getPermissionsAsync()
           if (status === 'granted') {
             const tokenData = await Notifications.getExpoPushTokenAsync({
-              projectId: '95e15bc2-b5de-4a43-a884-7055e320b629',
+              projectId: EXPO_PROJECT_ID,
             });
             await api.pushToken.register(tokenData.data);
             await scheduleTips();
@@ -168,10 +175,10 @@ export default function RootLayout() {
       const freshStaffToken = await secureStorage.getItem('staff_token')
       if (freshStaffToken) {
         try {
-          const { status } = await Notifications.requestPermissionsAsync()
+          const { status } = await Notifications.getPermissionsAsync()
           if (status === 'granted') {
             const tokenData = await Notifications.getExpoPushTokenAsync({
-              projectId: '95e15bc2-b5de-4a43-a884-7055e320b629',
+              projectId: EXPO_PROJECT_ID,
             })
             await api.pushToken.registerStaff(tokenData.data)
           }
@@ -320,8 +327,11 @@ export default function RootLayout() {
               return
             }
             // 401 = token geçersiz → oturumu temizle ve login'e yönlendir
-            if (e.message.includes('Yetkisiz') || e.message.includes('401')) {
+            if (e.message.includes('401')) {
               await supabase.auth.signOut()
+              await secureStorage.removeItem('mobile_token')
+              await secureStorage.removeItem('login_time')
+              await secureStorage.removeItem('session_expires_at')
               router.replace('/(auth)/login')
             }
           }

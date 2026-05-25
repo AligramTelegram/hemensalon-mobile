@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { api, setCachedTenant, getCachedTenant } from '@/lib/api'
 import * as Notifications from 'expo-notifications'
 import { queryKeys } from '@/lib/queryKeys'
+import { EXPO_PROJECT_ID } from '@/lib/constants'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 
@@ -86,25 +87,13 @@ export default function Login() {
   const [staffPassword, setStaffPassword] = useState('')
   const [showStaffPass, setShowStaffPass] = useState(false)
 
-  // Kayıtlı bilgileri yükle
+  // Kayıtlı bilgileri yükle (sadece email, şifre saklanmaz)
   useEffect(() => {
-    AsyncStorage.getItem('remember_owner').then(raw => {
-      if (!raw) return
-      try {
-        const saved = JSON.parse(raw)
-        setEmail(saved.email ?? '')
-        setPassword(saved.password ?? '')
-        setRememberMe(true)
-      } catch {}
+    secureStorage.getItem('remember_owner_email').then(v => {
+      if (v) { setEmail(v); setRememberMe(true) }
     })
-    AsyncStorage.getItem('remember_staff').then(raw => {
-      if (!raw) return
-      try {
-        const saved = JSON.parse(raw)
-        setStaffEmail(saved.email ?? '')
-        setStaffPassword(saved.password ?? '')
-        setRememberStaff(true)
-      } catch {}
+    secureStorage.getItem('remember_staff_email').then(v => {
+      if (v) { setStaffEmail(v); setRememberStaff(true) }
     })
   }, [])
 
@@ -185,11 +174,11 @@ export default function Login() {
         }
       }
 
-      // Beni hatırla — işletme
+      // Beni hatırla — işletme (sadece email, şifre saklanmaz)
       if (rememberMe) {
-        await AsyncStorage.setItem('remember_owner', JSON.stringify({ email, password }))
+        await secureStorage.setItem('remember_owner_email', email)
       } else {
-        await AsyncStorage.removeItem('remember_owner')
+        await secureStorage.removeItem('remember_owner_email')
       }
 
       try {
@@ -227,7 +216,6 @@ export default function Login() {
                 : businessCity.trim() || undefined,
               sector: businessSector,
               plan: 'BASLANGIC',
-              trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
             }),
           })
           if (!res.ok) {
@@ -296,18 +284,18 @@ export default function Login() {
         role: 'staff',
         staffId: data.staffId,
       }))
-      // Beni hatırla — personel
+      // Beni hatırla — personel (sadece email, şifre saklanmaz)
       if (rememberStaff) {
-        await AsyncStorage.setItem('remember_staff', JSON.stringify({ email: staffEmail.trim(), password: staffPassword }))
+        await secureStorage.setItem('remember_staff_email', staffEmail.trim())
       } else {
-        await AsyncStorage.removeItem('remember_staff')
+        await secureStorage.removeItem('remember_staff_email')
       }
       // Push token'ı giriş sonrası kaydet
       try {
         const { status } = await Notifications.requestPermissionsAsync()
         if (status === 'granted') {
           const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: '95e15bc2-b5de-4a43-a884-7055e320b629',
+            projectId: EXPO_PROJECT_ID,
           })
           await api.pushToken.registerStaff(tokenData.data)
         }

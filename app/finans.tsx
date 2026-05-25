@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useFocusEffect } from 'expo-router'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, RefreshControl, ActivityIndicator, ScrollView, Platform } from 'react-native'
 import { useRouter } from 'expo-router'
@@ -92,7 +92,7 @@ export default function Finans() {
   }
 
   // Period değişince extra'yı sıfırla
-  useMemo(() => { setExtraTransactions([]); setTxPage(1) }, [period])
+  useEffect(() => { setExtraTransactions([]); setTxPage(1) }, [period])
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({
     type: 'GELIR' as 'GELIR' | 'GIDER',
