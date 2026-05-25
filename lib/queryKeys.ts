@@ -2,6 +2,7 @@
 // Farklı hesaba giriş yapılınca cache çakışması olmaz.
 
 export const queryKeys = {
+  tenant:           (tid: string) => ['tenant', tid] as const,
   dashboard:        (tid: string) => ['dashboard', tid] as const,
   appointments:     (tid: string, date?: string) => date ? ['appointments', tid, date] : ['appointments', tid],
   customers:        (tid: string) => ['customers', tid] as const,

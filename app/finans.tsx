@@ -54,19 +54,15 @@ export default function Finans() {
     queryKey: queryKeys.transactions(tenantId, period),
     enabled: !!tenantId,
     queryFn: async () => {
-      const [txsPage, profile] = await Promise.all([
+      const today = new Date()
+      const from15 = new Date(today); from15.setDate(today.getDate() - 14)
+      const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      const [txsPage, profile, apts] = await Promise.all([
         api.transactions.list({ period, page: 1, limit: 50 }),
         api.tenant.get().catch(() => null),
+        api.appointments.list({ from: toISO(from15), to: toISO(today) }).catch(() => [] as Appointment[]),
       ])
-      const today = new Date()
-      const days = Array.from({ length: 15 }, (_, i) => {
-        const d = new Date(today); d.setDate(d.getDate() - i)
-        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-      })
-      const apts: Appointment[] = (await Promise.all(
-        days.map(date => api.appointments.list({ date }).catch(() => []))
-      )).flat()
-      return { txsPage, tenantProfile: profile, debts: apts.filter((a: Appointment) => a.status === 'TAMAMLANDI' && a.paid === false) }
+      return { txsPage, tenantProfile: profile, debts: (apts as Appointment[]).filter(a => a.status === 'TAMAMLANDI' && a.paid === false) }
     },
     staleTime: 60 * 1000,
   })
@@ -127,6 +123,7 @@ export default function Finans() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions(tenantId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
     } catch (e: unknown) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed'))

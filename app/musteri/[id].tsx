@@ -10,6 +10,9 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, Customer, CustomerNote, CustomerPackage, Package } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
+import { useTenantId } from '@/lib/useTenantId'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -42,6 +45,8 @@ export default function MusteriDetay() {
   const { currencySymbol } = usePreferences()
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const tenantId = useTenantId()
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [customerPackages, setCustomerPackages] = useState<CustomerPackage[]>([])
@@ -128,6 +133,7 @@ export default function MusteriDetay() {
         birthday: form.birthday.trim() || undefined,
       })
       setCustomer(prev => prev ? { ...prev, ...updated } : prev)
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers(tenantId) })
       setShowEditModal(false)
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_failed')) }
     setSaving(false)
@@ -164,7 +170,12 @@ export default function MusteriDetay() {
       { text: t('cancel'), style: 'cancel' },
       {
         text: t('delete'), style: 'destructive', onPress: async () => {
-          try { await api.customers.delete(id!); router.back() }
+          try {
+            await api.customers.delete(id!)
+            queryClient.invalidateQueries({ queryKey: queryKeys.customers(tenantId) })
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
+            router.back()
+          }
           catch { Alert.alert(t('error'), t('err_failed')) }
         },
       },

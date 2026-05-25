@@ -267,7 +267,10 @@ export default function Login() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        Alert.alert(t('auth_loginError'), data?.error ?? t('auth_invalidStaff'))
+        const msg = data?.error === 'TENANT_SUSPENDED'
+          ? 'İşletmenizin aboneliği sona erdi. Lütfen işletme sahibiyle iletişime geçin.'
+          : data?.error ?? t('auth_invalidStaff')
+        Alert.alert(t('auth_loginError'), msg)
         setLoading(false)
         return
       }

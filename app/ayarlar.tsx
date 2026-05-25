@@ -272,7 +272,7 @@ export default function Ayarlar() {
         {([
           { key: 'isletme',    label: t('settings_business'),   icon: 'business-outline' },
           { key: 'calisma',    label: t('workingHours'),         icon: 'time-outline' },
-          { key: 'entegrasyon',label: t('settings_about'),       icon: 'link-outline' },
+          { key: 'entegrasyon',label: t('settings_integrations'), icon: 'link-outline' },
         ] as { key: Tab; label: string; icon: IoniconsName }[]).map(t => (
           <TouchableOpacity
             key={t.key}
@@ -305,10 +305,10 @@ export default function Ayarlar() {
             )}
             <View style={s.smsRow}>
               <Text style={s.smsLabel}>SMS {t('total')}</Text>
-              <Text style={s.smsVal}>{profile?.smsUsed ?? 0} / {profile?.smsCredits ?? 0}</Text>
+              <Text style={s.smsVal}>{profile?.smsUsed ?? 0} / {(profile?.smsMonthlyLimit ?? 0) + (profile?.smsCredits ?? 0)}</Text>
             </View>
             <View style={s.track}>
-              <View style={[s.fill, { width: `${Math.min(((profile?.smsUsed ?? 0) / Math.max(profile?.smsCredits ?? 1, 1)) * 100, 100)}%` as any }]} />
+              <View style={[s.fill, { width: `${Math.min(((profile?.smsUsed ?? 0) / Math.max((profile?.smsMonthlyLimit ?? 0) + (profile?.smsCredits ?? 0), 1)) * 100, 100)}%` as any }]} />
             </View>
           </SectionCard>
 

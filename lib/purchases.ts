@@ -5,6 +5,9 @@ import Purchases, {
   PURCHASES_ERROR_CODE,
 } from 'react-native-purchases'
 import { Platform } from 'react-native'
+import Constants from 'expo-constants'
+
+const isExpoGo = Constants.appOwnership === 'expo'
 
 // ─── RevenueCat API Anahtarları ───────────────────────────────────────────────
 // app.revenuecat.com → Apps → API Keys bölümünden alınır
@@ -31,8 +34,9 @@ export const PLAN_ENTITLEMENT: Record<string, string> = {
 let _configured = false
 
 export async function initPurchases(userId?: string) {
+  if (isExpoGo) return  // Expo Go'da native store yok, sessizce atla
   const apiKey = Platform.OS === 'ios' ? RC_API_KEY_IOS : RC_API_KEY_ANDROID
-  if (!apiKey) return  // dev ortamında anahtar yoksa atla
+  if (!apiKey) return
   if (_configured) return
 
   Purchases.setLogLevel(LOG_LEVEL.ERROR)

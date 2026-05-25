@@ -3,6 +3,31 @@ import { secureStorage } from './secureStorage'
 
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://app.hemensalon.com'
 
+// Token refresh mutex — aynı anda birden fazla refresh'i önler
+let _refreshPromise: Promise<string | null> | null = null
+
+async function refreshAccessToken(refreshToken: string): Promise<string | null> {
+  if (_refreshPromise) return _refreshPromise
+  _refreshPromise = (async () => {
+    try {
+      const { data } = await supabase.auth.refreshSession({ refresh_token: refreshToken })
+      if (data.session?.access_token) {
+        await secureStorage.setItem('mobile_token', data.session.access_token)
+        if (data.session.refresh_token) {
+          await secureStorage.setItem('refresh_token', data.session.refresh_token)
+        }
+        return data.session.access_token
+      }
+      return null
+    } catch {
+      return null
+    } finally {
+      _refreshPromise = null
+    }
+  })()
+  return _refreshPromise
+}
+
 async function getHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -22,29 +47,13 @@ async function getHeaders(): Promise<Record<string, string>> {
   // Staff oturumu: mobile_token (gerçek JWT) kullan, Supabase session'a gerek yok
   if (staffToken) {
     let activeToken = mobileToken
-    // Token süresi dolduysa refresh_token ile yenile
     if (activeToken) {
       try {
         const payload = JSON.parse(atob(activeToken.split('.')[1]))
         const expiring = payload.exp * 1000 < Date.now() + 60_000
         if (expiring) {
-          const refreshToken = await secureStorage.getItem('refresh_token')
-          if (refreshToken) {
-            const { createClient: createSB } = await import('@supabase/supabase-js')
-            const sb = createSB(
-              process.env.EXPO_PUBLIC_SUPABASE_URL!,
-              process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
-              { auth: { autoRefreshToken: false, persistSession: false } }
-            )
-            const { data } = await sb.auth.refreshSession({ refresh_token: refreshToken })
-            if (data.session?.access_token) {
-              activeToken = data.session.access_token
-              await secureStorage.setItem('mobile_token', activeToken)
-              if (data.session.refresh_token) {
-                await secureStorage.setItem('refresh_token', data.session.refresh_token)
-              }
-            }
-          }
+          const rt = await secureStorage.getItem('refresh_token')
+          if (rt) activeToken = await refreshAccessToken(rt) ?? activeToken
         }
       } catch {}
     }
@@ -59,10 +68,13 @@ async function getHeaders(): Promise<Record<string, string>> {
 
   // Token süresi dolduysa veya 60 saniye içinde dolacaksa yenile
   if (session?.expires_at && session.expires_at * 1000 < Date.now() + 60_000) {
-    const { data } = await supabase.auth.refreshSession()
-    session = data.session
-    if (session?.access_token) {
-      await secureStorage.setItem('mobile_token', session.access_token)
+    const rt = session.refresh_token ?? await secureStorage.getItem('refresh_token')
+    if (rt) {
+      const refreshed = await refreshAccessToken(rt)
+      if (refreshed) {
+        const { data } = await supabase.auth.getSession()
+        session = data.session
+      }
     }
   }
 
@@ -70,13 +82,9 @@ async function getHeaders(): Promise<Record<string, string>> {
 
   // Hâlâ token yoksa önceden okunan mobileToken'ı kullan
   if (!accessToken && mobileToken) {
-    const refreshToken = await secureStorage.getItem('refresh_token')
-    if (refreshToken) {
-      const { data } = await supabase.auth.refreshSession({ refresh_token: refreshToken }).catch(() => ({ data: { session: null } }))
-      accessToken = data.session?.access_token ?? mobileToken
-      if (data.session?.access_token) {
-        await secureStorage.setItem('mobile_token', data.session.access_token)
-      }
+    const rt = await secureStorage.getItem('refresh_token')
+    if (rt) {
+      accessToken = await refreshAccessToken(rt) ?? mobileToken
     } else {
       accessToken = mobileToken
     }
@@ -128,8 +136,15 @@ function withTimeout(signal?: AbortSignal): AbortSignal {
 async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(path, BASE)
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), { headers: await getHeaders(), signal: withTimeout() })
+  const t0 = __DEV__ ? Date.now() : 0
+  const headersStart = __DEV__ ? Date.now() : 0
+  const headers = await getHeaders()
+  if (__DEV__) console.log(`[perf] getHeaders: ${Date.now() - headersStart}ms`)
+  const fetchStart = __DEV__ ? Date.now() : 0
+  const res = await fetch(url.toString(), { headers, signal: withTimeout() })
+  if (__DEV__) console.log(`[perf] fetch ${path}: ${Date.now() - fetchStart}ms (status=${res.status})`)
   const data = await res.json().catch(() => null)
+  if (__DEV__) console.log(`[perf] total GET ${path}: ${Date.now() - t0}ms`)
   if (!res.ok) {
     console.warn(`API GET failed: ${url.toString()}`, res.status, data)
     throw new Error(data?.error ?? `GET ${path} → ${res.status}`)
@@ -513,6 +528,7 @@ export const staffApi = {
     list: () => get<Service[]>('/api/staff/services'),
   },
   me: () => get<{ id: string; name: string; phone?: string; title?: string; color: string; tenant: { name: string; slug: string } }>('/api/staff/me'),
+  tenantStatus: () => get<{ active: boolean }>('/api/staff/tenant-status'),
   changePassword: (currentPassword: string, newPassword: string) =>
     post<{ success: boolean }>('/api/staff/change-password', { currentPassword, newPassword }),
 }

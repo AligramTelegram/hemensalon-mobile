@@ -6,7 +6,7 @@ import {
 } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { usePreferences } from '@/lib/usePreferences'
-import { useRouter } from 'expo-router'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { api, Appointment, Customer, Service, Staff } from '@/lib/api'
@@ -49,8 +49,9 @@ export default function Appointments() {
   const { currencySymbol: symbol } = usePreferences()
   const queryClient = useQueryClient()
   const tenantId = useTenantId()
+  const params = useLocalSearchParams<{ date?: string }>()
   const [refreshing, setRefreshing] = useState(false)
-  const [filterDate, setFilterDate] = useState(todayISO())
+  const [filterDate, setFilterDate] = useState(() => params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : todayISO())
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [staffFilter, setStaffFilter] = useState('ALL')
   const [showNew, setShowNew] = useState(false)
@@ -151,6 +152,7 @@ const weekFrom = toISO(weekStart)
       setShowNew(false)
       queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers(tenantId) })
     } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_createFailed')) }
     setSaving(false)
   }
@@ -163,7 +165,7 @@ const weekFrom = toISO(weekStart)
     try {
       const updated = await api.appointments.update(id, { status })
       setDetailApt(prev => prev?.id === id ? { ...prev, ...updated } : prev)
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
     } catch (e: unknown) {
       // Hata olursa eski duruma geri al
@@ -213,7 +215,7 @@ const weekFrom = toISO(weekStart)
         notes: editForm.notes || undefined,
       })
       setDetailApt(prev => prev ? { ...prev, ...updated } : prev)
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId) })
       setEditMode(false)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch (e: unknown) {
@@ -226,19 +228,21 @@ const weekFrom = toISO(weekStart)
     try {
       await api.appointments.update(id, { paid })
       setDetailApt(prev => prev?.id === id ? { ...prev, paid } : prev)
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
       Haptics.selectionAsync()
     } catch { Alert.alert(t('error'), t('appointments_paymentUpdated')) }
   }
 
 
   async function handleDelete(id: string) {
-    Alert.alert(t('appointments_delete'), t('appointments_deleteConfirm'), [
+    Alert.alert(t('appointments_cancel'), t('appointments_cancelConfirm'), [
       { text: t('cancel'), style: 'cancel' },
-      { text: t('delete'), style: 'destructive', onPress: async () => {
+      { text: t('appointments_cancel'), style: 'destructive', onPress: async () => {
         try {
           await api.appointments.update(id, { status: 'IPTAL' })
-          queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId, filterDate) })
+          queryClient.invalidateQueries({ queryKey: queryKeys.appointments(tenantId) })
+          queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
           setDetailApt(null)
         } catch (e: unknown) { Alert.alert(t('error'), e instanceof Error ? e.message : t('err_deleteFailed')) }
       }},

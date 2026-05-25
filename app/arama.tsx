@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { api, Customer, Appointment, Service } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
+import { usePreferences } from '@/lib/usePreferences'
 
 const PURPLE = '#7C3AED'
 
@@ -80,7 +81,7 @@ function AppointmentRow({ item, onPress }: { item: Appointment; onPress: () => v
   )
 }
 
-function ServiceRow({ item, onPress }: { item: Service; onPress: () => void }) {
+function ServiceRow({ item, onPress, currencySymbol }: { item: Service; onPress: () => void; currencySymbol: string }) {
   const { t } = useTranslation()
   return (
     <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.75}>
@@ -89,7 +90,7 @@ function ServiceRow({ item, onPress }: { item: Service; onPress: () => void }) {
         <Text style={s.rowTitle} numberOfLines={1}>{item.name}</Text>
         <Text style={s.rowSub}>{item.duration} {t('min_abbr')}</Text>
       </View>
-      <Text style={s.servicePrice}>₺{item.price.toLocaleString()}</Text>
+      <Text style={s.servicePrice}>{currencySymbol}{item.price.toLocaleString()}</Text>
     </TouchableOpacity>
   )
 }
@@ -126,6 +127,7 @@ export default function AramaScreen() {
   const { t } = useTranslation()
   const router = useRouter()
   const headerPad = useHeaderPad()
+  const { currencySymbol } = usePreferences()
   const inputRef = useRef<TextInput>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -246,7 +248,7 @@ export default function AramaScreen() {
               <AppointmentRow
                 key={item.id}
                 item={item}
-                onPress={() => router.push('/(tabs)/appointments' as never)}
+                onPress={() => router.push(`/(tabs)/appointments?date=${item.date?.split('T')[0] ?? ''}` as never)}
               />
             ))}
           </View>
@@ -259,6 +261,7 @@ export default function AramaScreen() {
               <ServiceRow
                 key={item.id}
                 item={item}
+                currencySymbol={currencySymbol}
                 onPress={() => router.push('/hizmetler' as never)}
               />
             ))}

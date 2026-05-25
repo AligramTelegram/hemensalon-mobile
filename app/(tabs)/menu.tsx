@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native'
 import { useHeaderPad } from '@/lib/useHeaderPad'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
-import { api, TenantProfile } from '@/lib/api'
+import { api, setCachedTenant } from '@/lib/api'
 import { secureStorage } from '@/lib/secureStorage'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
+import { TENANT_QUERY_KEY } from '@/lib/useTenantId'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -26,18 +28,22 @@ export default function Menu() {
   const { t } = useTranslation()
   const router = useRouter()
   const headerPad = useHeaderPad()
-  const [profile, setProfile] = useState<TenantProfile | null>(null)
   const [email, setEmail] = useState('')
   const [loggingOut, setLoggingOut] = useState(false)
 
-  useEffect(() => {
-    async function load() {
-      const [{ data: { user } }] = await Promise.all([supabase.auth.getUser()])
+  const { data: profile } = useQuery({
+    queryKey: TENANT_QUERY_KEY,
+    queryFn: async () => {
+      const [{ data: { user } }, tenant] = await Promise.all([
+        supabase.auth.getUser(),
+        api.tenant.get(),
+      ])
       setEmail(user?.email ?? '')
-      try { setProfile(await api.tenant.get()) } catch {}
-    }
-    load()
-  }, [])
+      setCachedTenant(tenant)
+      return tenant
+    },
+    staleTime: 5 * 60 * 1000,
+  })
 
   function handleLogout() {
     Alert.alert(t('logout'), t('menu_logoutConfirm'), [
@@ -91,8 +97,14 @@ export default function Menu() {
   const planColor = PLAN_COLOR[profile?.plan ?? 'BASLANGIC']
   const planLabel = PLAN_LABEL[profile?.plan ?? 'BASLANGIC'] ?? profile?.plan
 
-  const daysLeft = profile?.planEndsAt
-    ? Math.ceil((new Date(profile.planEndsAt).getTime() - Date.now()) / 86400000)
+  // Kalan gün: önce aktif plan, yoksa trial bak
+  const activeEndsAt = profile?.planEndsAt
+    ? new Date(profile.planEndsAt)
+    : profile?.trialEndsAt
+      ? new Date(profile.trialEndsAt)
+      : null
+  const daysLeft = activeEndsAt
+    ? Math.ceil((activeEndsAt.getTime() - Date.now()) / 86400000)
     : null
 
   const smsTotal = (profile?.smsMonthlyLimit ?? 0) + (profile?.smsCredits ?? 0)

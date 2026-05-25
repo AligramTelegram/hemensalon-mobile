@@ -61,13 +61,24 @@ export default function Dashboard() {
     return () => sub.remove()
   }, [])
 
+  const dashQueryStart = useRef(0)
   const { data: dashData, isLoading: loading, refetch: refetchDash } = useQuery({
     queryKey: queryKeys.dashboard(tenantId),
     enabled: !!tenantId,
     refetchInterval: appActive ? 30 * 1000 : false,
-    queryFn: () => api.dashboard.full(todayISO()),
+    queryFn: () => {
+      dashQueryStart.current = Date.now()
+      return api.dashboard.full(todayISO())
+    },
     staleTime: 20 * 1000,
   })
+
+  useEffect(() => {
+    if (dashData && dashQueryStart.current > 0 && __DEV__) {
+      console.log(`[perf] dashboard query→render: ${Date.now() - dashQueryStart.current}ms`)
+      dashQueryStart.current = 0
+    }
+  }, [dashData])
 
   useEffect(() => {
     if (!dashData) return

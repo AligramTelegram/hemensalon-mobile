@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { View, ActivityIndicator, I18nManager, Platform, Alert } from 'react-native';
 import { isRTL } from '@/lib/i18n';
 import * as Notifications from 'expo-notifications';
-import { api, getCachedTenant, setCachedTenant } from '@/lib/api';
+import { api, staffApi, getCachedTenant, setCachedTenant } from '@/lib/api';
 import { initPurchases } from '@/lib/purchases';
 import type { Session } from '@supabase/supabase-js';
 import { ThemeProvider } from '@/lib/theme'
@@ -66,6 +66,7 @@ export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [staffToken, setStaffToken] = useState<string | null>(null);
+  const [staffSuspended, setStaffSuspended] = useState(false);
   const router = useRouter();
   const segments = useSegments();
 
@@ -82,6 +83,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     async function setup() {
+      const setupStart = __DEV__ ? Date.now() : 0
       try {
       const country = await detectCountry();
       await initI18n(country);
@@ -130,20 +132,44 @@ export default function RootLayout() {
       ]);
       setStaffToken(st);
 
+      // Staff varsa abonelik durumunu setup'ta kontrol et — ekran görünmeden kilitle
+      if (st) {
+        try {
+          const result = await staffApi.tenantStatus()
+          console.log('[staff-suspended-check] tenantStatus result:', result)
+          if (!result.active) {
+            setStaffSuspended(true)
+            await AsyncStorage.setItem('staff_suspended', '1')
+          } else {
+            await AsyncStorage.removeItem('staff_suspended')
+          }
+        } catch (e) {
+          console.warn('[staff-suspended-check] ERROR:', e)
+        }
+      }
+
       // Dönüş kullanıcısı: routing bitmeden arka planda prefetch başlat
       if (s && !st && cachedTid && !isExpired) {
         const d = new Date()
         const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-        queryClient.prefetchQuery({
-          queryKey: ['dashboard', cachedTid],
-          queryFn: () => api.dashboard.full(todayStr),
-          staleTime: 20 * 1000,
+        if (__DEV__) console.log(`[perf] setup done in ${Date.now() - setupStart}ms — starting prefetch`)
+        const prefetchStart = __DEV__ ? Date.now() : 0
+        Promise.all([
+          queryClient.prefetchQuery({
+            queryKey: ['dashboard', cachedTid],
+            queryFn: () => api.dashboard.full(todayStr),
+            staleTime: 20 * 1000,
+          }),
+          queryClient.prefetchQuery({
+            queryKey: ['appointments', cachedTid, todayStr],
+            queryFn: () => api.appointments.list({ date: todayStr }),
+            staleTime: 20 * 1000,
+          }),
+        ]).then(() => {
+          if (__DEV__) console.log(`[perf] prefetch complete: ${Date.now() - prefetchStart}ms`)
         }).catch(() => {})
-        queryClient.prefetchQuery({
-          queryKey: ['appointments', cachedTid, todayStr],
-          queryFn: () => api.appointments.list({ date: todayStr }),
-          staleTime: 20 * 1000,
-        }).catch(() => {})
+      } else if (__DEV__) {
+        console.log(`[perf] setup done in ${Date.now() - setupStart}ms (no prefetch)`)
       }
 
       if (s) {
@@ -241,6 +267,8 @@ export default function RootLayout() {
         secureStorage.removeItem('login_time');
         AsyncStorage.removeItem('cached_tenant_id').catch(() => {});
         setStaffToken(null);
+        // Tüm query cache'ini temizle — eski kullanıcı verisi gözükmesin
+        queryClient.clear();
       }
     });
 
@@ -289,6 +317,29 @@ export default function RootLayout() {
         return;
       }
 
+      // Staff abonelik kontrolü
+      if (isStaffSession && inStaff) {
+        // setup'ta set edilen veya önceki oturumdan kalan bayrak
+        const suspFlag = await AsyncStorage.getItem('staff_suspended')
+        console.log('[route-guard] staffSuspended state:', staffSuspended, 'suspFlag:', suspFlag, 'segments:', segments)
+        if (staffSuspended || suspFlag === '1') {
+          router.replace('/(staff)/suspended')
+          return
+        }
+        // Sadece index'te (tab değişiminde değil) canlı kontrol yap
+        if (!segments[1]) {
+          try {
+            const { active } = await staffApi.tenantStatus()
+            if (!active) {
+              setStaffSuspended(true)
+              await AsyncStorage.setItem('staff_suspended', '1')
+              router.replace('/(staff)/suspended')
+              return
+            }
+          } catch {}
+        }
+      }
+
       // Erişim kilidi kontrolü — sadece owner oturumu için
       if (session && !isStaffSession) {
         try {
@@ -321,6 +372,7 @@ export default function RootLayout() {
           if (e instanceof Error) {
             // Staff hesabı owner girişi denedi — çıkış yap, login'e gönder
             if (e.message.includes('STAFF_ACCOUNT')) {
+              queryClient.clear()
               await supabase.auth.signOut()
               await secureStorage.removeItem('mobile_token')
               router.replace('/(auth)/login')

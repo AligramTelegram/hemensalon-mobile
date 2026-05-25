@@ -137,6 +137,10 @@ export default function StaffLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="suspended"
+        options={{ href: null }}
+      />
     </Tabs>
   )
 }

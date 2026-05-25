@@ -1,89 +1,69 @@
-import { useEffect, useState } from 'react'
-import { api, TenantProfile } from './api'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { api, TenantProfile, getCachedTenant } from './api'
+import { TENANT_QUERY_KEY } from './useTenantId'
 
 export type LockReason = 'trial_expired' | 'subscription_expired' | null
 
 export type TrialStatus = {
   loading: boolean
-  isTrialActive: boolean        // deneme süresi içinde
-  isTrialExpired: boolean       // deneme bitti, ödeme yok
-  isSubscriptionActive: boolean // ücretli plan geçerli
-  isSubscriptionExpired: boolean// ücretli plan süresi doldu
-  isLocked: boolean             // uygulama kilitli mi (herhangi bir sebepten)
+  isTrialActive: boolean
+  isTrialExpired: boolean
+  isSubscriptionActive: boolean
+  isSubscriptionExpired: boolean
+  isLocked: boolean
   lockReason: LockReason
-  daysLeft: number              // deneme veya abonelik için kalan gün
-  hoursLeft: number             // kalan saat (daysLeft 0 iken)
-  endsAt: Date | null           // aktif olan tarihin bitişi
+  daysLeft: number
+  hoursLeft: number
+  endsAt: Date | null
   profile: TenantProfile | null
 }
 
+function compute(profile: TenantProfile): Omit<TrialStatus, 'loading' | 'profile'> {
+  const now = Date.now()
+  const trialEndsAt = profile.trialEndsAt ? new Date(profile.trialEndsAt) : null
+  const planEndsAt = profile.planEndsAt ? new Date(profile.planEndsAt) : null
+
+  const subMsLeft = planEndsAt ? planEndsAt.getTime() - now : 0
+  const isSubscriptionActive = !!planEndsAt && subMsLeft > 0
+  const isSubscriptionExpired = !!planEndsAt && subMsLeft <= 0
+
+  const trialMsLeft = trialEndsAt ? trialEndsAt.getTime() - now : 0
+  const isTrialActive = !!trialEndsAt && trialMsLeft > 0 && !isSubscriptionActive
+  const isTrialExpired = !!trialEndsAt && trialMsLeft <= 0 && !isSubscriptionActive
+
+  const isLocked = !isTrialActive && !isSubscriptionActive
+  const lockReason: LockReason = isSubscriptionExpired
+    ? 'subscription_expired'
+    : isTrialExpired
+      ? 'trial_expired'
+      : null
+
+  const activeMsLeft = isSubscriptionActive ? subMsLeft : isTrialActive ? trialMsLeft : 0
+  const daysLeft = activeMsLeft > 0 ? Math.floor(activeMsLeft / 86400000) : 0
+  const hoursLeft = activeMsLeft > 0 ? Math.floor((activeMsLeft % 86400000) / 3600000) : 0
+  const endsAt = isSubscriptionActive ? planEndsAt : trialEndsAt
+
+  return { isTrialActive, isTrialExpired, isSubscriptionActive, isSubscriptionExpired, isLocked, lockReason, daysLeft, hoursLeft, endsAt }
+}
+
 export function useTrial(): TrialStatus {
-  const [status, setStatus] = useState<TrialStatus>({
-    loading: true,
-    isTrialActive: false,
-    isTrialExpired: false,
-    isSubscriptionActive: false,
-    isSubscriptionExpired: false,
-    isLocked: false,
-    lockReason: null,
-    daysLeft: 0,
-    hoursLeft: 0,
-    endsAt: null,
-    profile: null,
+  const cached = getCachedTenant()
+  const { data: profile, isLoading } = useQuery({
+    queryKey: TENANT_QUERY_KEY,
+    queryFn: () => api.tenant.get(),
+    staleTime: 5 * 60 * 1000,
+    initialData: cached ?? undefined,
   })
 
-  useEffect(() => {
-    api.tenant.get().then(profile => {
-      compute(profile)
-    }).catch(() => {
-      setStatus(s => ({ ...s, loading: false }))
-    })
-  }, [])
-
-  function compute(profile: TenantProfile) {
-    const now = Date.now()
-
-    const trialEndsAt = profile.trialEndsAt ? new Date(profile.trialEndsAt) : null
-    const planEndsAt = profile.planEndsAt ? new Date(profile.planEndsAt) : null
-
-    // Deneme durumu — trialEndsAt varsa trial kullanıcısı
-    const trialMsLeft = trialEndsAt ? trialEndsAt.getTime() - now : 0
-    const isTrialActive = !!trialEndsAt && trialMsLeft > 0 && !planEndsAt
-    const isTrialExpired = !!trialEndsAt && trialMsLeft <= 0 && !planEndsAt
-
-    // Abonelik durumu — planEndsAt varsa ücretli kullanıcı
-    const subMsLeft = planEndsAt ? planEndsAt.getTime() - now : 0
-    const isSubscriptionActive = !!planEndsAt && subMsLeft > 0
-    const isSubscriptionExpired = !!planEndsAt && subMsLeft <= 0
-
-    // Kilit: ne trial aktif ne ücretli plan aktif
-    const isLocked = !isTrialActive && !isSubscriptionActive
-    const lockReason: LockReason = isTrialExpired
-      ? 'trial_expired'
-      : isSubscriptionExpired
-        ? 'subscription_expired'
-        : null
-
-    // Kalan süre hesabı
-    const activeMsLeft = isSubscriptionActive ? subMsLeft : isTrialActive ? trialMsLeft : 0
-    const daysLeft = activeMsLeft > 0 ? Math.floor(activeMsLeft / 86400000) : 0
-    const hoursLeft = activeMsLeft > 0 ? Math.floor((activeMsLeft % 86400000) / 3600000) : 0
-    const endsAt = isSubscriptionActive ? planEndsAt : trialEndsAt
-
-    setStatus({
-      loading: false,
-      isTrialActive,
-      isTrialExpired,
-      isSubscriptionActive,
-      isSubscriptionExpired,
-      isLocked,
-      lockReason,
-      daysLeft,
-      hoursLeft,
-      endsAt,
-      profile,
-    })
-  }
-
-  return status
+  return useMemo<TrialStatus>(() => {
+    if (!profile) {
+      return {
+        loading: isLoading, isTrialActive: false, isTrialExpired: false,
+        isSubscriptionActive: false, isSubscriptionExpired: false,
+        isLocked: false, lockReason: null, daysLeft: 0, hoursLeft: 0, endsAt: null, profile: null,
+      }
+    }
+    return { loading: false, profile, ...compute(profile) }
+  }, [profile, isLoading])
 }

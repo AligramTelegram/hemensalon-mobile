@@ -169,13 +169,14 @@ export default function Customers() {
     }
     try {
       if (editing) {
-        const updated = await api.customers.update(editing.id, payload)
+        await api.customers.update(editing.id, payload)
         queryClient.invalidateQueries({ queryKey: queryKeys.customers(tenantId) })
         await savePhoto(editing.id, pendingPhoto)
       } else {
         const created = await api.customers.create(payload)
         if (pendingPhoto) await savePhoto(created.id, pendingPhoto)
         queryClient.invalidateQueries({ queryKey: queryKeys.customers(tenantId) })
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setShowModal(false)

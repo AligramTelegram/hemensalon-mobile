@@ -171,7 +171,7 @@ export default function DenemeBitti() {
         </View>
 
         {isSubExpired && trial.profile && packages.length > 0 && (() => {
-          const currentPlanKey = PLAN_TO_RC_ID[trial.profile!.plan] ?? ''
+          const currentPlanKey = PLAN_TO_RC_ID[trial.profile.plan] ?? ''
           const currentPkg = packages.find(p => p.identifier === currentPlanKey)
           if (!currentPkg) return null
           const meta = PLAN_META[currentPkg.identifier]

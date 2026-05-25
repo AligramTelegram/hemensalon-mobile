@@ -73,7 +73,7 @@ export default function StaffAppointments() {
 
   useFocusEffect(
     useCallback(() => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.staffAppointments('staff', selectedDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.staffAppointments('staff') })
     }, [selectedDate, queryClient])
   )
 
@@ -83,7 +83,7 @@ export default function StaffAppointments() {
     try {
       const updated = await staffApi.appointments.update(apt.id, { status })
       setSelectedApt(prev => prev?.id === apt.id ? { ...prev, ...updated } : prev)
-      queryClient.invalidateQueries({ queryKey: queryKeys.staffAppointments('staff', selectedDate) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.staffAppointments('staff') })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch {
       setSelectedApt(prev => prev?.id === apt.id ? { ...prev, status: apt.status as Appointment['status'] } : prev)
