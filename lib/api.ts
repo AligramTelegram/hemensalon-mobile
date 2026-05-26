@@ -40,9 +40,6 @@ async function getHeaders(): Promise<Record<string, string>> {
     secureStorage.getItem('mobile_token').catch(() => null),
   ])
 
-  if (__DEV__) {
-    console.log('[api:getHeaders]', { staffTokenPresent: !!staffToken, mobileTokenPresent: !!mobileToken })
-  }
 
   // Staff oturumu: mobile_token (gerçek JWT) kullan, Supabase session'a gerek yok
   if (staffToken) {
@@ -93,9 +90,6 @@ async function getHeaders(): Promise<Record<string, string>> {
   if (accessToken) {
     headers['x-mobile-token'] = accessToken
     headers['Authorization'] = `Bearer ${accessToken}`
-    if (__DEV__) console.log('[api:getHeaders] using mobile Authorization Bearer')
-  } else if (__DEV__) {
-    console.log('[api:getHeaders] no access token resolved')
   }
 
   return headers

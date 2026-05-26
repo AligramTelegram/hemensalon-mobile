@@ -136,16 +136,13 @@ export default function RootLayout() {
       if (st) {
         try {
           const result = await staffApi.tenantStatus()
-          console.log('[staff-suspended-check] tenantStatus result:', result)
           if (!result.active) {
             setStaffSuspended(true)
             await AsyncStorage.setItem('staff_suspended', '1')
           } else {
             await AsyncStorage.removeItem('staff_suspended')
           }
-        } catch (e) {
-          console.warn('[staff-suspended-check] ERROR:', e)
-        }
+        } catch {}
       }
 
       // Dönüş kullanıcısı: routing bitmeden arka planda prefetch başlat
@@ -321,7 +318,6 @@ export default function RootLayout() {
       if (isStaffSession && inStaff) {
         // setup'ta set edilen veya önceki oturumdan kalan bayrak
         const suspFlag = await AsyncStorage.getItem('staff_suspended')
-        console.log('[route-guard] staffSuspended state:', staffSuspended, 'suspFlag:', suspFlag, 'segments:', segments)
         if (staffSuspended || suspFlag === '1') {
           router.replace('/(staff)/suspended')
           return

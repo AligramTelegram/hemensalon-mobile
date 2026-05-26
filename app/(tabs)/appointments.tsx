@@ -123,6 +123,7 @@ const weekFrom = toISO(weekStart)
     queryKey: queryKeys.customers(tenantId),
     queryFn: () => api.customers.list(),
     staleTime: 5 * 60 * 1000,
+    enabled: showNew && !!tenantId,
   })
   const customers = customersRes?.data ?? []
 

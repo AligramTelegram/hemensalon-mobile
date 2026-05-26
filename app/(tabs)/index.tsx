@@ -81,8 +81,7 @@ export default function Dashboard() {
   })
 
   useEffect(() => {
-    if (dashData && dashQueryStart.current > 0 && __DEV__) {
-      console.log(`[perf] dashboard query→render: ${Date.now() - dashQueryStart.current}ms`)
+    if (dashData) {
       dashQueryStart.current = 0
     }
   }, [dashData])
