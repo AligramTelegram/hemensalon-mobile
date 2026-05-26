@@ -130,15 +130,9 @@ function withTimeout(signal?: AbortSignal): AbortSignal {
 async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(path, BASE)
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const t0 = __DEV__ ? Date.now() : 0
-  const headersStart = __DEV__ ? Date.now() : 0
   const headers = await getHeaders()
-  if (__DEV__) console.log(`[perf] getHeaders: ${Date.now() - headersStart}ms`)
-  const fetchStart = __DEV__ ? Date.now() : 0
   const res = await fetch(url.toString(), { headers, signal: withTimeout() })
-  if (__DEV__) console.log(`[perf] fetch ${path}: ${Date.now() - fetchStart}ms (status=${res.status})`)
   const data = await res.json().catch(() => null)
-  if (__DEV__) console.log(`[perf] total GET ${path}: ${Date.now() - t0}ms`)
   if (!res.ok) {
     console.warn(`API GET failed: ${url.toString()}`, res.status, data)
     throw new Error(data?.error ?? `GET ${path} → ${res.status}`)

@@ -147,11 +147,14 @@ export default function Dashboard() {
     Animated.spring(fabAnim, { toValue: 0, useNativeDriver: true, tension: 200, friction: 15 }).start()
   }
 
-  // Her sayfadan döndüğünde arka planda sessizce yenile
+  // Sayfaya dönüldüğünde sadece veri eskiyse yenile (30s stale)
   useFocusEffect(
     useCallback(() => {
       if (!tenantId) return
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(tenantId) })
+      const key = queryKeys.dashboard(tenantId)
+      const state = queryClient.getQueryState(key)
+      const isStale = !state || Date.now() - (state.dataUpdatedAt ?? 0) > 30 * 1000
+      if (isStale) queryClient.invalidateQueries({ queryKey: key })
     }, [tenantId, queryClient])
   )
 
