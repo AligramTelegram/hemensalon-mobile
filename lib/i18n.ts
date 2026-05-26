@@ -1036,6 +1036,11 @@ const tr = {
 
   // ── Promosyonlar ────────────────────────────────────────────
   promo_title: 'Promosyonlar',
+  promo_sub: 'İndirim kodları ve kampanyalarınızı yönetin',
+  promo_coming_desc: 'Promosyon ve indirim kodu özelliği yakında kullanıma girecek. Müşterilerinize özel kampanyalar oluşturabileceksiniz.',
+  promo_f1: 'İndirim kodu oluşturma',
+  promo_f2: 'Yüzde veya sabit indirim',
+  promo_f3: 'Kullanım limiti belirleme',
   promo_new_code: 'Yeni Kod',
   promo_hero_sub: '{{active}} aktif kod · {{total}} toplam kullanım',
   promo_tab_active: 'Aktif ({{count}})',
@@ -2528,6 +2533,11 @@ const en: typeof tr = {
 
   // ── Promotions ──────────────────────────────────────────────
   promo_title: 'Promotions',
+  promo_sub: 'Manage your discount codes and campaigns',
+  promo_coming_desc: 'Promotions and discount code features are coming soon. You will be able to create special campaigns for your customers.',
+  promo_f1: 'Create discount codes',
+  promo_f2: 'Percentage or fixed discount',
+  promo_f3: 'Set usage limits',
   promo_new_code: 'New Code',
   promo_hero_sub: '{{active}} active codes · {{total}} total uses',
   promo_tab_active: 'Active ({{count}})',
@@ -3972,6 +3982,11 @@ const de: typeof tr = {
 
   // ── Aktionen ────────────────────────────────────────────────
   promo_title: 'Aktionen',
+  promo_sub: 'Verwalten Sie Ihre Rabattcodes und Kampagnen',
+  promo_coming_desc: 'Die Funktion für Aktionen und Rabattcodes kommt bald. Sie können spezielle Kampagnen für Ihre Kunden erstellen.',
+  promo_f1: 'Rabattcodes erstellen',
+  promo_f2: 'Prozentualer oder fester Rabatt',
+  promo_f3: 'Nutzungslimits festlegen',
   promo_new_code: 'Neuer Code',
   promo_hero_sub: '{{active}} aktive Codes · {{total}} Gesamtnutzungen',
   promo_tab_active: 'Aktiv ({{count}})',
@@ -5401,6 +5416,11 @@ const ar: typeof tr = {
 
   // ── العروض الترويجية ────────────────────────────────────────
   promo_title: 'العروض',
+  promo_sub: 'إدارة رموز الخصم والحملات الترويجية',
+  promo_coming_desc: 'ميزة العروض الترويجية ورموز الخصم قادمة قريباً. ستتمكن من إنشاء حملات خاصة لعملائك.',
+  promo_f1: 'إنشاء رموز الخصم',
+  promo_f2: 'خصم بالنسبة المئوية أو ثابت',
+  promo_f3: 'تحديد حد الاستخدام',
   promo_new_code: 'رمز جديد',
   promo_hero_sub: '{{active}} رموز نشطة · {{total}} إجمالي الاستخدامات',
   promo_tab_active: 'نشط ({{count}})',
