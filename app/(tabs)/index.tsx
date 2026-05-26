@@ -54,6 +54,13 @@ export default function Dashboard() {
   const [userName, setUserName] = useState('')
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
 
+  // AsyncStorage'dan ismi anında yükle (veri gelmeden önce göster)
+  useEffect(() => {
+    AsyncStorage.getItem('owner_name').then(cached => {
+      if (cached) setUserName(cached)
+    }).catch(() => null)
+  }, [])
+
   const [appActive, setAppActive] = useState(AppState.currentState === 'active')
 
   useEffect(() => {
@@ -82,7 +89,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!dashData) return
-    setUserName(dashData.tenant?.name ?? '')
+    const ownerName = dashData.tenant?.ownerName || dashData.tenant?.name || ''
+    setUserName(ownerName)
+    if (ownerName) AsyncStorage.setItem('owner_name', ownerName).catch(() => null)
     AsyncStorage.getItem('read_notification_ids').catch(() => null).then(readIdsRaw => {
       const readIds: Set<string> = readIdsRaw ? new Set(JSON.parse(readIdsRaw)) : new Set()
       setUnreadNotifCount(dashData.notifications.filter(n => n.isNew && !readIds.has(n.id)).length)
