@@ -21,6 +21,7 @@ workflows:
         script: npm install -g eas-cli
       - name: Build iOS via EAS
         script: |
+          eas whoami || eas login --token $EXPO_TOKEN
           eas build --platform ios --profile production --non-interactive
     artifacts:
       - "**/*.ipa"
