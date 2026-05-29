@@ -10,21 +10,43 @@ workflows:
           include: true
     environment:
       node: 20.17.0
+      xcode: latest
+      cocoapods: default
       groups:
         - ios
       vars:
-        EXPO_TOKEN: $EXPO_TOKEN
+        BUNDLE_ID: com.appointly.hemensalon
+        APPLE_TEAM_ID: UTJ55CMR25
     scripts:
       - name: Install dependencies
         script: npm install
       - name: Install EAS CLI
         script: npm install -g eas-cli
-      - name: Build iOS via EAS
+      - name: Set up keychain
+        script: keychain initialize
+      - name: Fetch signing certificate & provisioning profile
         script: |
-          eas whoami || eas login --token $EXPO_TOKEN
-          eas build --platform ios --profile production --non-interactive
+          app-store-connect fetch-signing-files $BUNDLE_ID \
+            --type IOS_APP_STORE \
+            --certificate-key @env:CERTIFICATE_PRIVATE_KEY \
+            --create
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+      - name: Set up code signing settings on Xcode project
+        script: xcode-project use-profiles
+      - name: Build iOS
+        script: |
+          eas build --platform ios --profile production --non-interactive --local \
+            --output hemensalon.ipa
     artifacts:
-      - "**/*.ipa"
+      - hemensalon.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        api_key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        api_issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        submit_to_testflight: true
 
   android-production:
     name: Android Production
