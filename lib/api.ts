@@ -5,9 +5,12 @@ const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://app.hemensalon.com'
 
 // Token refresh mutex — aynı anda birden fazla refresh'i önler
 let _refreshPromise: Promise<string | null> | null = null
+let _refreshing = false
 
 async function refreshAccessToken(refreshToken: string): Promise<string | null> {
   if (_refreshPromise) return _refreshPromise
+  if (_refreshing) return null
+  _refreshing = true
   _refreshPromise = (async () => {
     try {
       const { data } = await supabase.auth.refreshSession({ refresh_token: refreshToken })
@@ -23,6 +26,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
       return null
     } finally {
       _refreshPromise = null
+      _refreshing = false
     }
   })()
   return _refreshPromise
@@ -46,11 +50,16 @@ async function getHeaders(): Promise<Record<string, string>> {
     let activeToken = mobileToken
     if (activeToken) {
       try {
-        const payload = JSON.parse(atob(activeToken.split('.')[1]))
-        const expiring = payload.exp * 1000 < Date.now() + 60_000
-        if (expiring) {
-          const rt = await secureStorage.getItem('refresh_token')
-          if (rt) activeToken = await refreshAccessToken(rt) ?? activeToken
+        const parts = activeToken.split('.')
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]))
+          if (payload && typeof payload.exp === 'number') {
+            const expiring = payload.exp * 1000 < Date.now() + 60_000
+            if (expiring) {
+              const rt = await secureStorage.getItem('refresh_token')
+              if (rt) activeToken = await refreshAccessToken(rt) ?? activeToken
+            }
+          }
         }
       } catch {}
     }
@@ -103,7 +112,8 @@ export function getCachedTenant(): TenantProfile | null {
   if (_tenantCache && Date.now() - _tenantCache.ts < TENANT_CACHE_TTL) return _tenantCache.data
   return null
 }
-export function setCachedTenant(data: TenantProfile) {
+export function setCachedTenant(data: TenantProfile | null) {
+  if (!data) { _tenantCache = null; return }
   _tenantCache = { data, ts: Date.now() }
 }
 export function invalidateTenantCache() {
@@ -134,7 +144,7 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
   const res = await fetch(url.toString(), { headers, signal: withTimeout() })
   const data = await res.json().catch(() => null)
   if (!res.ok) {
-    console.warn(`API GET failed: ${url.toString()}`, res.status, data)
+    if (__DEV__) console.warn(`API GET failed: ${path}`, res.status)
     throw new Error(data?.error ?? `GET ${path} → ${res.status}`)
   }
   return data
@@ -149,7 +159,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   })
   const data = await res.json().catch(() => null)
   if (!res.ok) {
-    console.warn(`API POST failed: ${BASE}${path}`, res.status, data)
+    if (__DEV__) console.warn(`API POST failed: ${path}`, res.status)
     if (res.status === 402 || res.status === 403) throw new PlanLimitError(data?.error ?? 'Plan limiti aşıldı')
     throw new Error(data?.error ?? `POST ${path} → ${res.status}`)
   }
@@ -165,7 +175,7 @@ async function put<T>(path: string, body: unknown): Promise<T> {
   })
   const data = await res.json().catch(() => null)
   if (!res.ok) {
-    console.warn(`API PUT failed: ${BASE}${path}`, res.status, data)
+    if (__DEV__) console.warn(`API PUT failed: ${path}`, res.status)
     if (res.status === 402 || res.status === 403) throw new PlanLimitError(data?.error ?? 'Plan limiti aşıldı')
     throw new Error(data?.error ?? `PUT ${path} → ${res.status}`)
   }
@@ -181,7 +191,7 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   })
   const data = await res.json().catch(() => null)
   if (!res.ok) {
-    console.warn(`API PATCH failed: ${BASE}${path}`, res.status, data)
+    if (__DEV__) console.warn(`API PATCH failed: ${path}`, res.status)
     if (res.status === 402 || res.status === 403) throw new PlanLimitError(data?.error ?? 'Plan limiti aşıldı')
     throw new Error(data?.error ?? `PATCH ${path} → ${res.status}`)
   }
@@ -195,7 +205,7 @@ async function del(path: string): Promise<void> {
     signal: withTimeout(),
   })
   if (!res.ok) {
-    console.warn(`API DELETE failed: ${BASE}${path}`, res.status)
+    if (__DEV__) console.warn(`API DELETE failed: ${path}`, res.status)
     throw new Error(`DELETE ${path} → ${res.status}`)
   }
 }

@@ -140,9 +140,12 @@ export default function RootLayout() {
             setStaffSuspended(true)
             await AsyncStorage.setItem('staff_suspended', '1')
           } else {
+            setStaffSuspended(false)
             await AsyncStorage.removeItem('staff_suspended')
           }
-        } catch {}
+        } catch {
+          // Network hatası: önceki flag'i koru, bypass olmaz
+        }
       }
 
       // Dönüş kullanıcısı: routing bitmeden arka planda prefetch başlat
@@ -227,7 +230,7 @@ export default function RootLayout() {
       } catch {}
       try {
         const raw = await AsyncStorage.getItem(PUSH_NOTIFS_KEY)
-        const list: StoredPushNotif[] = raw ? JSON.parse(raw) : []
+        const list: StoredPushNotif[] = raw ? JSON.parse(raw) as StoredPushNotif[] : []
         const newEntry: StoredPushNotif = {
           id: notif.request.identifier,
           title: notif.request.content.title ?? '',
