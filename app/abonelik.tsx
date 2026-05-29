@@ -362,10 +362,15 @@ async function handleUpgrade(planKey: string) {
             )
           })}
 
-          <TouchableOpacity style={s.restoreBtn} onPress={handleRestore} disabled={restoring}>
+          <TouchableOpacity style={s.restoreBtn} onPress={handleRestore} disabled={restoring} activeOpacity={0.75}>
             {restoring
               ? <ActivityIndicator color="#7C3AED" size="small" />
-              : <Text style={s.restoreTxt}>{t('sub_restore_btn')}</Text>
+              : (
+                <>
+                  <Ionicons name="refresh-outline" size={16} color="#7C3AED" />
+                  <Text style={s.restoreTxt}>{t('sub_restore_btn')}</Text>
+                </>
+              )
             }
           </TouchableOpacity>
 
@@ -458,7 +463,7 @@ const s = StyleSheet.create({
   supportCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#EDE9FE', marginHorizontal: 16, marginTop: 4, borderRadius: 18, padding: 16 },
   supportTitle: { fontSize: 14, fontWeight: '700', color: '#4C1D95', marginBottom: 2 },
   supportSub: { fontSize: 12, color: '#7C3AED' },
-  restoreBtn: { alignItems: 'center', paddingVertical: 14, marginHorizontal: 16, marginTop: 4 },
+  restoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, marginHorizontal: 16, marginTop: 4, borderRadius: 12, borderWidth: 1.5, borderColor: '#7C3AED' + '40', backgroundColor: '#7C3AED' + '08' },
   restoreTxt: { fontSize: 14, color: '#7C3AED', fontWeight: '600' },
   legalTxt: { fontSize: 11, color: '#9CA3AF', textAlign: 'center', lineHeight: 16, marginHorizontal: 16, marginBottom: 8 },
 
