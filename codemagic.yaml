@@ -41,12 +41,6 @@ workflows:
     artifacts:
       - hemensalon.ipa
       - /tmp/xcodebuild_logs/*.log
-    publishing:
-      app_store_connect:
-        api_key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        api_issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        submit_to_testflight: true
 
   android-production:
     name: Android Production
